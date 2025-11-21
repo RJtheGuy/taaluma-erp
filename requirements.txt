@@ -1,0 +1,11 @@
+Django==5.2.8
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.3.1
+django-filter==24.3
+drf-yasg==1.21.8
+celery==5.5.3
+redis==7.1.0
+django-environ==0.12.0
+psycopg2-binary==2.9.11
+coverage==7.6.10
+factory-boy==3.3.1
