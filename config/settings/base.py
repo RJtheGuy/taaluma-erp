@@ -18,8 +18,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASE_DIR / 'apps'))
 
 SECRET_KEY = 'django-insecure-5kbahqa-lldhr*ts2pc=1e^9v+&#g-5*0=!_qp(dfv1zd0*y2u'
-DEBUG = True
-ALLOWED_HOSTS = []
+DEBUG = False
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 INSTALLED_APPS = [
