@@ -9,6 +9,6 @@ django-environ==0.12.0
 psycopg2-binary==2.9.11
 coverage==7.6.10
 factory-boy==3.3.1
-dj-database-url
-psycopg2-binary
-
+gunicorn==21.2.0
+whitenoise==6.6.0
+dj-database-url==2.1.0
