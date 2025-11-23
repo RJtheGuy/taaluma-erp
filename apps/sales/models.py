@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 from apps.core.models import TrackableModel
 
 
@@ -38,6 +40,55 @@ class Order(TrackableModel):
         
     def __str__(self):
         return f"Order #{self.id} - {self.customer}"
+    
+    def save(self, *args, **kwargs):
+        """Calculate total and deduct stock on order creation"""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        # Calculate total from items
+        if self.items.exists():
+            self.total = sum(item.subtotal for item in self.items.all())
+            # Use update() to avoid infinite loop
+            Order.objects.filter(pk=self.pk).update(total=self.total)
+        
+        # Deduct stock only on new orders (not updates)
+        if is_new and self.status in ['pending', 'confirmed']:
+            self.deduct_stock()
+    
+    def deduct_stock(self):
+        """Deduct stock quantities for all order items"""
+        from apps.inventory.models import Stock
+        
+        for item in self.items.all():
+            # Find stock for this product (first available warehouse)
+            try:
+                stock = Stock.objects.filter(
+                    product=item.product,
+                    quantity__gte=item.quantity  # Only if enough stock
+                ).first()
+                
+                if stock:
+                    stock.quantity -= item.quantity
+                    stock.save()
+                else:
+                    # Log warning if insufficient stock
+                    print(f"Warning: Insufficient stock for {item.product.name}")
+            except Stock.DoesNotExist:
+                print(f"Warning: No stock record for {item.product.name}")
+    
+    def restore_stock(self):
+        """Restore stock when order is cancelled"""
+        from apps.inventory.models import Stock
+        
+        for item in self.items.all():
+            try:
+                stock = Stock.objects.filter(product=item.product).first()
+                if stock:
+                    stock.quantity += item.quantity
+                    stock.save()
+            except Stock.DoesNotExist:
+                pass
 
 
 class OrderItem(TrackableModel):
@@ -57,3 +108,17 @@ class OrderItem(TrackableModel):
         
     def __str__(self):
         return f"{self.product.name} x {self.quantity}"
+
+
+# Signal to handle order status changes
+@receiver(pre_save, sender=Order)
+def handle_order_status_change(sender, instance, **kwargs):
+    """Restore stock when order is cancelled"""
+    if instance.pk:  # Only for existing orders
+        try:
+            old_order = Order.objects.get(pk=instance.pk)
+            # If status changed to cancelled, restore stock
+            if old_order.status != 'cancelled' and instance.status == 'cancelled':
+                instance.restore_stock()
+        except Order.DoesNotExist:
+            pass
