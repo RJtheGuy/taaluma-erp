@@ -9,11 +9,19 @@ class WarehouseAdmin(admin.ModelAdmin):
     search_fields = ['name', 'location']
 
 
+class StockInline(admin.TabularInline):
+    """Display stock levels inline with products"""
+    model = Stock
+    extra = 1
+    fields = ['warehouse', 'quantity', 'reorder_level']
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['name', 'sku', 'category', 'cost_price', 'selling_price', 'is_active']
     list_filter = ['category', 'is_active']
     search_fields = ['name', 'sku']
+    inlines = [StockInline]  # Show stock levels on product page
 
 
 @admin.register(Stock)
@@ -21,3 +29,4 @@ class StockAdmin(admin.ModelAdmin):
     list_display = ['product', 'warehouse', 'quantity', 'reorder_level']
     list_filter = ['warehouse']
     search_fields = ['product__name', 'warehouse__name']
+
