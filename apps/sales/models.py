@@ -33,6 +33,7 @@ class Order(TrackableModel):
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="pending")
     notes = models.TextField(null=True, blank=True)
+    _stock_deducted = False  # Track if stock was already deducted
 
     class Meta:
         db_table = "orders"
@@ -41,25 +42,19 @@ class Order(TrackableModel):
     def __str__(self):
         return f"Order #{self.id} - {self.customer}"
     
-    def save(self, *args, **kwargs):
-        """Calculate total and deduct stock on order creation"""
-        is_new = self.pk is None
-        super().save(*args, **kwargs)
-        
-        # Calculate total from items
+    def calculate_total(self):
+        """Calculate and update order total"""
         if self.items.exists():
             self.total = sum(item.subtotal for item in self.items.all())
-            # Use update() to avoid infinite loop
             Order.objects.filter(pk=self.pk).update(total=self.total)
-        
-        # Deduct stock only on new orders (not updates)
-        if is_new and self.status in ['pending', 'confirmed']:
-            self.deduct_stock()
     
     def deduct_stock(self):
         """Deduct stock quantities for all order items"""
         from apps.inventory.models import Stock
         
+        if self._stock_deducted:
+            return  # Already deducted, don't do it again
+            
         for item in self.items.all():
             # Find stock for this product (first available warehouse)
             try:
@@ -71,11 +66,13 @@ class Order(TrackableModel):
                 if stock:
                     stock.quantity -= item.quantity
                     stock.save()
+                    print(f"✓ Deducted {item.quantity} units of {item.product.name} from {stock.warehouse.name}")
                 else:
-                    # Log warning if insufficient stock
-                    print(f"Warning: Insufficient stock for {item.product.name}")
+                    print(f"⚠ Warning: Insufficient stock for {item.product.name}")
             except Stock.DoesNotExist:
-                print(f"Warning: No stock record for {item.product.name}")
+                print(f"⚠ Warning: No stock record for {item.product.name}")
+        
+        self._stock_deducted = True
     
     def restore_stock(self):
         """Restore stock when order is cancelled"""
@@ -87,6 +84,7 @@ class Order(TrackableModel):
                 if stock:
                     stock.quantity += item.quantity
                     stock.save()
+                    print(f"✓ Restored {item.quantity} units of {item.product.name} to {stock.warehouse.name}")
             except Stock.DoesNotExist:
                 pass
 
