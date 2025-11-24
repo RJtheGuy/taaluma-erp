@@ -1,10 +1,11 @@
+# accounts/models.py
 import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
 class User(AbstractUser):
-    # CRITICAL: UUID Primary Key (DO NOT REMOVE!)
+    # UUID Primary Key - REQUIRED!
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -36,12 +37,13 @@ class User(AbstractUser):
     
     class Meta:
         ordering = ['-created_at']
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
     
     def __str__(self):
         return self.username
     
     def get_accessible_warehouses(self):
-        """Returns warehouses this user can access"""
         from inventory.models import Warehouse
         
         if self.is_superuser:
@@ -68,5 +70,4 @@ class User(AbstractUser):
         return Warehouse.objects.none()
     
     def can_access_warehouse(self, warehouse):
-        """Check if user can access specific warehouse"""
         return warehouse in self.get_accessible_warehouses()
