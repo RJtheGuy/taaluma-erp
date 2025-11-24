@@ -11,13 +11,6 @@ class User(AbstractUser):
         editable=False
     )
     
-    organization = models.ForeignKey(
-        'organizations.Organization',
-        on_delete=models.CASCADE,
-        related_name='users',
-        null=True,
-        blank=True
-    )
     
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     is_active = models.BooleanField(default=True)
