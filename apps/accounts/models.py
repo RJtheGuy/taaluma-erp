@@ -1,8 +1,16 @@
-# accounts/models.py
+import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+
 class User(AbstractUser):
+    # CRITICAL: UUID Primary Key (DO NOT REMOVE!)
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    
     organization = models.ForeignKey(
         'organizations.Organization',
         on_delete=models.CASCADE,
@@ -11,7 +19,6 @@ class User(AbstractUser):
         blank=True
     )
     
-    # ✅ ADD THIS NEW FIELD
     assigned_warehouse = models.ForeignKey(
         'inventory.Warehouse',
         on_delete=models.SET_NULL,
@@ -33,7 +40,6 @@ class User(AbstractUser):
     def __str__(self):
         return self.username
     
-    # ✅ ADD THIS METHOD
     def get_accessible_warehouses(self):
         """Returns warehouses this user can access"""
         from inventory.models import Warehouse
@@ -61,7 +67,6 @@ class User(AbstractUser):
         
         return Warehouse.objects.none()
     
-    # ✅ ADD THIS METHOD
     def can_access_warehouse(self, warehouse):
         """Check if user can access specific warehouse"""
         return warehouse in self.get_accessible_warehouses()
