@@ -19,13 +19,35 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'customer', 'total', 'status', 'created_at']
-    list_filter = ['status', 'created_at']
+    list_display = ['id', 'customer', 'warehouse', 'total', 'status', 'created_at']
+    list_filter = ['status', 'warehouse', 'created_at']
     search_fields = ['customer__name', 'id']
     inlines = [OrderItemInline]
     readonly_fields = ['total']
     
+    def get_queryset(self, request):
+        """Filter orders based on user's warehouse assignment"""
+        qs = super().get_queryset(request)
+        
+        if request.user.is_superuser:
+            return qs
+        
+        if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
+            return qs.filter(warehouse=request.user.assigned_warehouse)
+        
+        return qs
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Pre-select warehouse for assigned users"""
+        if db_field.name == "warehouse":
+            if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
+                kwargs["initial"] = request.user.assigned_warehouse.id
+                kwargs["queryset"] = Warehouse.objects.filter(id=request.user.assigned_warehouse.id)
+        
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
     def save_model(self, request, obj, form, change):
+        """Save the order - stock deduction happens in save_formset"""
         obj._is_new_order = obj.pk is None
         
         if change:
@@ -40,6 +62,7 @@ class OrderAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
     
     def save_formset(self, request, form, formset, change):
+        """Save the inline items and then handle stock + total calculation"""
         instances = formset.save(commit=True)
         
         order = form.instance
