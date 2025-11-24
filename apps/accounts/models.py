@@ -10,6 +10,14 @@ class User(AbstractUser):
         default=uuid.uuid4,
         editable=False
     )
+
+    assigned_warehouse = models.ForeignKey(
+        'inventory.Warehouse',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Warehouse this user manages"
+    )
     
     
     phone_number = models.CharField(max_length=20, blank=True, null=True)
