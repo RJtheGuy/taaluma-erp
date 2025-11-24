@@ -2,13 +2,11 @@
 from django.contrib import admin
 from .models import Customer, Order, OrderItem
 
-
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
     list_display = ['name', 'email', 'phone', 'is_active', 'created_at']
     list_filter = ['is_active']
     search_fields = ['name', 'email', 'phone']
-
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -16,35 +14,18 @@ class OrderItemInline(admin.TabularInline):
     fields = ['product', 'quantity', 'price', 'subtotal']
     readonly_fields = ['subtotal']
 
-
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'customer', 'warehouse', 'total', 'status', 'created_at']
-    list_filter = ['status', 'warehouse', 'created_at']
+    list_display = ['id', 'customer', 'total', 'status', 'created_at']  # Removed 'warehouse'
+    list_filter = ['status', 'created_at']  # Removed 'warehouse'
     search_fields = ['customer__name', 'id']
     inlines = [OrderItemInline]
     readonly_fields = ['total']
     
-    def get_queryset(self, request):
-        """Filter orders based on user's warehouse assignment"""
-        qs = super().get_queryset(request)
-        
-        if request.user.is_superuser:
-            return qs
-        
-        if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
-            return qs.filter(warehouse=request.user.assigned_warehouse)
-        
-        return qs
+    # Removed get_queryset - no warehouse filter needed since Order doesn't have warehouse field
+    # If you want to filter by warehouse, you'd need to add a warehouse field to your Order model
     
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Pre-select warehouse for assigned users"""
-        if db_field.name == "warehouse":
-            if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
-                kwargs["initial"] = request.user.assigned_warehouse.id
-                kwargs["queryset"] = Warehouse.objects.filter(id=request.user.assigned_warehouse.id)
-        
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    # Removed formfield_for_foreignkey - no warehouse field to pre-select
     
     def save_model(self, request, obj, form, change):
         """Save the order - stock deduction happens in save_formset"""
