@@ -1,6 +1,4 @@
 from django.db import models
-from django.db.models.signals import pre_save
-from django.dispatch import receiver
 from apps.core.models import TrackableModel
 
 
@@ -169,7 +167,3 @@ class OrderItem(TrackableModel):
         
     def __str__(self):
         return f"{self.product.name} x {self.quantity}"
-
-
-# Remove the pre_save signal - we handle this in admin now
-# It was causing issues because it ran before items were saved
