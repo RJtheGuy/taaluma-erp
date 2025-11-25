@@ -1,65 +1,27 @@
-# accounts/models.py
-import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from apps.core.models import BaseModel
 
 
-class User(AbstractUser):
-    """Custom User model with warehouse assignment for location-based access control"""
+class User(AbstractUser, BaseModel):
+    """Custom user model with phone and role"""
+    phone = models.CharField(max_length=20, null=True, blank=True)
+    role = models.CharField(max_length=50, default="staff")
     
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False
-    )
-    
+    # ADD THIS ONE LINE:
     assigned_warehouse = models.ForeignKey(
         'inventory.Warehouse',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='assigned_users',
-        help_text="Assign user to specific warehouse for location-based access. Leave empty for full access.",
-        verbose_name="Assigned Warehouse"
+        help_text="Warehouse this user manages"
     )
-    
-    phone_number = models.CharField(
-        max_length=20, 
-        blank=True, 
-        null=True,
-        help_text="Contact phone number"
-    )
-    
-    is_active = models.BooleanField(
-        default=True,
-        help_text="User can login when active"
-    )
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
-        ordering = ['-created_at']
-        verbose_name = 'User'
-        verbose_name_plural = 'Users'
-    
+        app_label = 'accounts'
+        db_table = "users"
+        verbose_name = "User"
+        verbose_name_plural = "Users"
+
     def __str__(self):
         return self.username
-    
-    @property
-    def full_name(self):
-        """Return user's full name"""
-        return f"{self.first_name} {self.last_name}".strip() or self.username
-    
-    def has_warehouse_access(self, warehouse):
-        """Check if user can access a specific warehouse"""
-        # Superusers have access to everything
-        if self.is_superuser:
-            return True
-        
-        # Users without assignment have full access (owners/general managers)
-        if not self.assigned_warehouse:
-            return True
-        
-        # Users with assignment can only access their warehouse
-        return self.assigned_warehouse == warehouse
