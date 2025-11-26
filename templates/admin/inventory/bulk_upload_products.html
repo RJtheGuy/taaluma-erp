@@ -1,1 +1,99 @@
+{% extends 'admin/base_site.html' %}
 
+{% block content %}
+<div style="padding: 20px; max-width: 900px;">
+    <h1>📤 Bulk Upload Products</h1>
+    
+    <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
+        <h3 style="margin-top: 0;">📋 CSV Format Required</h3>
+        <p><strong>Your CSV file must have these columns (exact names):</strong></p>
+        <pre style="background: white; padding: 15px; border-radius: 5px; overflow-x: auto;">name,sku,category,cost_price,selling_price,description
+Barolo DOCG 2015,WINE-001,Wine,25.00,55.00,Premium red wine from Piedmont
+Prosecco Superiore,WINE-002,Wine,8.00,18.00,Sparkling wine from Valdobbiadene
+Craft IPA,BEER-001,Beer,3.50,8.00,India Pale Ale from local brewery
+Sari Silk Red,TEX-001,Textiles,18.50,42.00,Premium silk sari from India</pre>
+        
+        <h4>Column Descriptions:</h4>
+        <ul style="line-height: 1.8;">
+            <li><strong>name</strong> - Product name (required)</li>
+            <li><strong>sku</strong> - Unique product code (required, will update if exists)</li>
+            <li><strong>category</strong> - Product category (e.g., Wine, Beer, Textiles)</li>
+            <li><strong>cost_price</strong> - What you paid for it (numbers only, no € symbol)</li>
+            <li><strong>selling_price</strong> - What you sell it for (numbers only)</li>
+            <li><strong>description</strong> - Product details (optional)</li>
+        </ul>
+    </div>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <h4 style="margin-top: 0;">💡 Tips for Success</h4>
+        <ul style="line-height: 1.8;">
+            <li>First row MUST be the header row (column names)</li>
+            <li>SKU must be unique - if SKU exists, product will be updated</li>
+            <li>Use decimal point for prices (25.50, not 25,50)</li>
+            <li>Save your Excel file as CSV (Comma Separated Values)</li>
+            <li>Recommended: Test with 5-10 products first</li>
+        </ul>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+                Select CSV File:
+            </label>
+            <input type="file" name="csv_file" accept=".csv" required 
+                   style="padding: 10px; border: 2px solid #ddd; border-radius: 5px; width: 100%; font-size: 14px;">
+        </div>
+        
+        <div style="display: flex; gap: 15px; margin-top: 30px;">
+            <button type="submit" 
+                    style="background: #4caf50; color: white; padding: 12px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold;">
+                📤 Upload Products
+            </button>
+            
+            <a href="{% url 'admin:inventory_product_changelist' %}" 
+               style="background: #757575; color: white; padding: 12px 30px; border-radius: 5px; text-decoration: none; display: inline-block; font-size: 16px; font-weight: bold;">
+                ← Cancel
+            </a>
+        </div>
+    </form>
+    
+    <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 30px;">
+        <h3>📥 Sample CSV Files</h3>
+        <p>Download these sample files to see the correct format:</p>
+        
+        <div style="margin-top: 15px;">
+            <strong>Wine & Beer Example:</strong>
+            <pre style="background: white; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 12px;">name,sku,category,cost_price,selling_price,description
+Barolo DOCG 2015,WINE-BAR-2015,Red Wine,28.00,65.00,Full-bodied red wine
+Chianti Classico 2018,WINE-CHI-2018,Red Wine,12.00,28.00,Traditional Tuscan wine
+Prosecco DOC,WINE-PRO-2023,Sparkling,6.50,15.00,Fresh and fruity bubbles
+Craft IPA,BEER-IPA-001,Craft Beer,3.50,8.50,Hoppy India Pale Ale
+Lager Premium,BEER-LAG-001,Lager,2.80,6.50,Crisp and refreshing</pre>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <strong>Ethnic Products Example:</strong>
+            <pre style="background: white; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 12px;">name,sku,category,cost_price,selling_price,description
+Sari Silk Blue,TEX-SARI-BLU,Textiles,15.00,35.00,Handwoven silk sari
+Basmati Rice 5kg,FOOD-RICE-5KG,Food,8.00,18.00,Premium aged basmati
+Turmeric Powder 500g,SPICE-TUR-500,Spices,3.50,8.00,Organic turmeric
+Wooden Mask,CRAFT-MASK-01,Crafts,12.00,30.00,Hand-carved wooden mask
+Argan Oil 100ml,COSM-ARG-100,Cosmetics,15.00,35.00,Pure Moroccan argan oil</pre>
+        </div>
+    </div>
+</div>
+
+<style>
+    button:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+        transition: all 0.2s;
+    }
+    
+    a:hover {
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
