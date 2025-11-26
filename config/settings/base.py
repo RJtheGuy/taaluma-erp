@@ -14,7 +14,7 @@ from pathlib import Path
 import sys
 
 # Build paths
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASE_DIR / 'apps'))
 
 SECRET_KEY = 'django-insecure-5kbahqa-lldhr*ts2pc=1e^9v+&#g-5*0=!_qp(dfv1zd0*y2u'
@@ -60,8 +60,8 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # 'DIRS': [],
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [],
+        # 'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
