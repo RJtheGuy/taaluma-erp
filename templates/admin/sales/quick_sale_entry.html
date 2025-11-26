@@ -1,1 +1,401 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Quick Sale - {{ warehouse.name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        
+        .messages {
+            padding: 15px 20px;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        
+        .message.warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .form-container {
+            padding: 30px;
+        }
+        
+        .customer-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .customer-info h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .products-section h3 {
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .product-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            transition: all 0.2s;
+        }
+        
+        .product-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+        
+        .product-card.selected {
+            border-color: #667eea;
+            background: #f0f3ff;
+        }
+        
+        .product-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .product-sku {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .product-price {
+            font-size: 18px;
+            color: #667eea;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .quantity-control button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            font-size: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .quantity-control button:active {
+            transform: scale(0.95);
+        }
+        
+        .quantity-control input {
+            width: 60px;
+            text-align: center;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .total-section {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .total-label {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .total-amount {
+            font-size: 48px;
+            font-weight: 700;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .submit-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+        
+        @media (max-width: 600px) {
+            .product-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .total-amount {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛒 Quick Sale Entry</h1>
+            <p>{{ warehouse.name }}</p>
+        </div>
+        
+        {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <form method="post" class="form-container" id="saleForm">
+            {% csrf_token %}
+            
+            <div class="customer-info">
+                <h3>👤 Customer Info (Optional)</h3>
+                <div class="form-group">
+                    <label>Customer Name</label>
+                    <input type="text" name="customer_name" placeholder="Walk-in Customer" value="Walk-in Customer">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" name="customer_phone" placeholder="+39 XXX XXX XXXX">
+                </div>
+            </div>
+            
+            <div class="products-section">
+                <h3>📦 Select Products</h3>
+                
+                <div class="product-grid">
+                    {% for product in products %}
+                    <div class="product-card" data-product-id="{{ product.id }}">
+                        <div class="product-name">{{ product.name }}</div>
+                        <div class="product-sku">SKU: {{ product.sku }}</div>
+                        <div class="product-price">€{{ product.selling_price }}</div>
+                        
+                        <div class="quantity-control">
+                            <button type="button" onclick="decreaseQty('{{ product.id }}')">−</button>
+                            <input type="number" 
+                                   id="qty_{{ product.id }}" 
+                                   name="quantity_{{ product.id }}" 
+                                   value="0" 
+                                   min="0" 
+                                   max="999"
+                                   onchange="updateTotal()">
+                            <button type="button" onclick="increaseQty('{{ product.id }}')">+</button>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p>No products available. Please add products to inventory first.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="total-section">
+                <div class="total-label">TOTAL</div>
+                <div class="total-amount" id="totalAmount">€0.00</div>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                ✅ Complete Sale
+            </button>
+        </form>
+    </div>
+    
+    <script>
+        // Product prices (from Django)
+        const productPrices = {
+            {% for product in products %}
+            '{{ product.id }}': {{ product.selling_price }},
+            {% endfor %}
+        };
+        
+        function increaseQty(productId) {
+            const input = document.getElementById('qty_' + productId);
+            input.value = parseInt(input.value) + 1;
+            updateTotal();
+            highlightCard(productId);
+        }
+        
+        function decreaseQty(productId) {
+            const input = document.getElementById('qty_' + productId);
+            if (parseInt(input.value) > 0) {
+                input.value = parseInt(input.value) - 1;
+                updateTotal();
+                if (input.value == 0) {
+                    unhighlightCard(productId);
+                }
+            }
+        }
+        
+        function highlightCard(productId) {
+            const card = document.querySelector(`[data-product-id="${productId}"]`);
+            card.classList.add('selected');
+        }
+        
+        function unhighlightCard(productId) {
+            const card = document.querySelector(`[data-product-id="${productId}"]`);
+            card.classList.remove('selected');
+        }
+        
+        function updateTotal() {
+            let total = 0;
+            
+            for (const productId in productPrices) {
+                const input = document.getElementById('qty_' + productId);
+                if (input) {
+                    const qty = parseInt(input.value) || 0;
+                    const price = productPrices[productId];
+                    total += qty * price;
+                    
+                    // Highlight/unhighlight based on quantity
+                    if (qty > 0) {
+                        highlightCard(productId);
+                    } else {
+                        unhighlightCard(productId);
+                    }
+                }
+            }
+            
+            document.getElementById('totalAmount').textContent = '€' + total.toFixed(2);
+            
+            // Enable/disable submit button
+            const submitBtn = document.getElementById('submitBtn');
+            if (total > 0) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.5';
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTotal();
+            
+            // Disable submit initially if no items
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.5';
+        });
+    </script>
+</body>
+</html>
