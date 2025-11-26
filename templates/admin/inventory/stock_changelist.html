@@ -1,1 +1,10 @@
+{% extends "admin/change_list.html" %}
 
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="{% url 'admin:inventory_stock_bulk_upload' %}" class="addlink" style="background: #4caf50 !important;">
+            📤 Bulk Upload CSV
+        </a>
+    </li>
+{% endblock %}
