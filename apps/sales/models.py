@@ -187,6 +187,9 @@ class Order(BaseModel):
         # Only validate stock for confirmed orders
         if self.status != 'confirmed':
             return
+
+        if not self.pk:
+            return
         
         # Get all items in this order
         items = self.items.all()
