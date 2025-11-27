@@ -242,7 +242,7 @@ class OrderAdmin(admin.ModelAdmin):
         'order_id_short',
         'customer',
         'warehouse',
-        'total_display',
+        'total',
         'status_display',
         'created_at'
     ]
