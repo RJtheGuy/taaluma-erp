@@ -1,6 +1,7 @@
-# sales/admin.py
+# apps/sales/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
+from django.core.exceptions import ValidationError
 from .models import Customer, Order, OrderItem
 
 
@@ -74,7 +75,6 @@ class OrderAdmin(admin.ModelAdmin):
     
     def has_change_permission(self, request, obj=None):
         """Allow viewing but prevent editing confirmed/shipped/delivered orders"""
-        # Always allow viewing (returning True allows access to change page)
         return super().has_change_permission(request, obj)
     
     def has_delete_permission(self, request, obj=None):
@@ -149,7 +149,7 @@ class OrderAdmin(admin.ModelAdmin):
                         '❌ Cannot modify confirmed/shipped/delivered orders. Delete and recreate if needed.',
                         level='error'
                     )
-                    return  # Don't save
+                    return
             except Order.DoesNotExist:
                 pass
         
@@ -168,107 +168,76 @@ class OrderAdmin(admin.ModelAdmin):
             obj._old_status = None
         
         super().save_model(request, obj, form, change)
-
+    
     def save_formset(self, request, form, formset, change):
-    order = form.instance
-    
-    # Block if order is confirmed/shipped/delivered
-    if order.status in ['confirmed', 'shipped', 'delivered'] and change:
-        self.message_user(
-            request,
-            '❌ Cannot modify items on confirmed orders',
-            level='error'
-        )
-        return
-    
-    instances = formset.save(commit=True)
-    
-    order.calculate_total()
-    
-    new_status = order.status
-    old_status = getattr(order, '_old_status', None)
-    is_new = getattr(order, '_is_new_order', False)
-    
-    # New order as confirmed/shipped/delivered
-    if is_new and new_status in ['confirmed', 'shipped', 'delivered']:
-        if order.warehouse:
-            try:
-                order.deduct_stock()
-                self.message_user(request, f'✅ Order created and stock deducted from {order.warehouse.name}', level='success')
-            except ValidationError as e:
-                self.message_user(request, str(e.message), level='error')
-                return
-        else:
-            self.message_user(request, '⚠️ No warehouse - stock NOT deducted', level='warning')
-    
-    # Pending to confirmed/shipped/delivered
-    elif change and old_status == 'pending' and new_status in ['confirmed', 'shipped', 'delivered']:
-        if order.warehouse:
-            try:
-                order.deduct_stock()
-                self.message_user(request, f'✅ Order confirmed - stock deducted from {order.warehouse.name}', level='success')
-            except ValidationError as e:
-                self.message_user(request, str(e.message), level='error')
-                return
-        else:
-            self.message_user(request, '⚠️ No warehouse assigned!', level='error')
-    
-    # To cancelled
-    elif change and old_status != 'cancelled' and new_status == 'cancelled':
-        if order.warehouse:
-            order.restore_stock()
-            self.message_user(request, f'🔄 Order cancelled - stock restored to {order.warehouse.name}', level='warning')
-    
-    # Pending
-    elif new_status == 'pending':
-        self.message_user(request, 'ℹ️ Order saved as Pending - stock will be deducted when confirmed', level='info')
-
-    
-    # def save_formset(self, request, form, formset, change):
-    #     order = form.instance
+        order = form.instance
         
-    #     # Block if order is confirmed/shipped/delivered
-    #     if order.status in ['confirmed', 'shipped', 'delivered'] and change:
-    #         self.message_user(
-    #             request,
-    #             '❌ Cannot modify items on confirmed orders',
-    #             level='error'
-    #         )
-    #         return
+        # Block if order is confirmed/shipped/delivered
+        if order.status in ['confirmed', 'shipped', 'delivered'] and change:
+            self.message_user(
+                request,
+                '❌ Cannot modify items on confirmed orders',
+                level='error'
+            )
+            return
         
-    #     instances = formset.save(commit=True)
+        instances = formset.save(commit=True)
         
-    #     order.calculate_total()
+        order.calculate_total()
         
-    #     new_status = order.status
-    #     old_status = getattr(order, '_old_status', None)
-    #     is_new = getattr(order, '_is_new_order', False)
+        new_status = order.status
+        old_status = getattr(order, '_old_status', None)
+        is_new = getattr(order, '_is_new_order', False)
         
-    #     # New order as confirmed/shipped/delivered
-    #     if is_new and new_status in ['confirmed', 'shipped', 'delivered']:
-    #         if order.warehouse:
-    #             order.deduct_stock()
-    #             self.message_user(request, f'✅ Order created and stock deducted from {order.warehouse.name}', level='success')
-    #         else:
-    #             self.message_user(request, '⚠️ No warehouse - stock NOT deducted', level='warning')
+        # New order as confirmed/shipped/delivered
+        if is_new and new_status in ['confirmed', 'shipped', 'delivered']:
+            if order.warehouse:
+                try:
+                    order.deduct_stock()
+                    self.message_user(
+                        request,
+                        f'✅ Order created and stock deducted from {order.warehouse.name}',
+                        level='success'
+                    )
+                except ValidationError as e:
+                    self.message_user(request, str(e.message), level='error')
+                    return
+            else:
+                self.message_user(request, '⚠️ No warehouse - stock NOT deducted', level='warning')
         
-    #     # Pending to confirmed/shipped/delivered
-    #     elif change and old_status == 'pending' and new_status in ['confirmed', 'shipped', 'delivered']:
-    #         if order.warehouse:
-    #             order.deduct_stock()
-    #             self.message_user(request, f'✅ Order confirmed - stock deducted from {order.warehouse.name}', level='success')
-    #         else:
-    #             self.message_user(request, '⚠️ No warehouse assigned!', level='error')
+        # Pending to confirmed/shipped/delivered
+        elif change and old_status == 'pending' and new_status in ['confirmed', 'shipped', 'delivered']:
+            if order.warehouse:
+                try:
+                    order.deduct_stock()
+                    self.message_user(
+                        request,
+                        f'✅ Order confirmed - stock deducted from {order.warehouse.name}',
+                        level='success'
+                    )
+                except ValidationError as e:
+                    self.message_user(request, str(e.message), level='error')
+                    return
+            else:
+                self.message_user(request, '⚠️ No warehouse assigned!', level='error')
         
-    #     # To cancelled
-    #     elif change and old_status != 'cancelled' and new_status == 'cancelled':
-    #         if order.warehouse:
-    #             order.restore_stock()
-    #             self.message_user(request, f'🔄 Order cancelled - stock restored to {order.warehouse.name}', level='warning')
+        # To cancelled
+        elif change and old_status != 'cancelled' and new_status == 'cancelled':
+            if order.warehouse:
+                order.restore_stock()
+                self.message_user(
+                    request,
+                    f'🔄 Order cancelled - stock restored to {order.warehouse.name}',
+                    level='warning'
+                )
         
-    #     # Pending
-    #     elif new_status == 'pending':
-    #         self.message_user(request, 'ℹ️ Order saved as Pending - stock will be deducted when confirmed', level='info')
+        # Pending
+        elif new_status == 'pending':
+            self.message_user(
+                request,
+                'ℹ️ Order saved as Pending - stock will be deducted when confirmed',
+                level='info'
+            )
 
 
 @admin.register(OrderItem)
