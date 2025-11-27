@@ -248,7 +248,7 @@ class OrderAdmin(admin.ModelAdmin):
     ]
     list_filter = ['status', 'warehouse', 'created_at']
     search_fields = ['customer__name', 'customer__email', 'id']
-    readonly_fields = ['total', 'created_at', 'updated_at']  # ← FIXED!
+    readonly_fields = ['is_locked','total', 'created_at', 'updated_at']  # ← FIXED!
     inlines = [OrderItemInline]
     
     fieldsets = (
@@ -263,7 +263,7 @@ class OrderAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('System Info', {
-            'fields': ('created_at', 'updated_at'),  # ← FIXED!
+            'fields': ('is_locked','created_at', 'updated_at'),  # ← FIXED!
             'classes': ('collapse',)
         }),
     )
