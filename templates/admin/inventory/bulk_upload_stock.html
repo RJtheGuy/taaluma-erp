@@ -1,20 +1,252 @@
 {% extends 'admin/base_site.html' %}
 
+{% block extrastyle %}
+<style>
+    /* ========================================
+       DARK MODE / LIGHT MODE RESPONSIVE STYLES
+       ======================================== */
+    
+    /* Light Mode (Default) */
+    :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8f9fa;
+        --bg-info: #e3f2fd;
+        --bg-warning: #fff3cd;
+        --bg-success: #e8f5e9;
+        --text-primary: #333333;
+        --text-secondary: #666666;
+        --border-color: #ddd;
+        --input-bg: #ffffff;
+        --input-border: #ddd;
+        --input-text: #333;
+        --code-bg: #ffffff;
+        --code-border: #e0e0e0;
+    }
+    
+    /* Dark Mode */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d2d;
+            --bg-info: #1a3a52;
+            --bg-warning: #3d3414;
+            --bg-success: #1b3a1f;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --border-color: #444;
+            --input-bg: #2d2d2d;
+            --input-border: #444;
+            --input-text: #e0e0e0;
+            --code-bg: #2d2d2d;
+            --code-border: #444;
+        }
+    }
+    
+    /* Container */
+    .upload-container {
+        padding: 20px;
+        max-width: 900px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+    }
+    
+    .upload-container h1 {
+        color: var(--text-primary);
+        margin-bottom: 20px;
+    }
+    
+    /* Info Box */
+    .info-box {
+        background: var(--bg-info);
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .info-box h3 {
+        margin-top: 0;
+        color: #2196f3;
+    }
+    
+    .info-box p,
+    .info-box ul,
+    .info-box li {
+        color: var(--text-primary);
+    }
+    
+    /* Warning Box */
+    .warning-box {
+        background: var(--bg-warning);
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .warning-box h4 {
+        margin-top: 0;
+        color: #f57c00;
+    }
+    
+    .warning-box ul,
+    .warning-box li {
+        color: var(--text-primary);
+    }
+    
+    /* Success Box */
+    .success-box {
+        background: var(--bg-success);
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 20px;
+        border-left: 4px solid #4caf50;
+    }
+    
+    .success-box strong {
+        color: #2e7d32;
+    }
+    
+    /* Code Block */
+    pre {
+        background: var(--code-bg);
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        border: 1px solid var(--code-border);
+        color: var(--text-primary);
+        font-family: 'Courier New', monospace;
+    }
+    
+    /* Form Container */
+    .form-container {
+        background: var(--bg-secondary);
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin: 20px 0;
+    }
+    
+    /* Form Label */
+    .form-group label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: var(--text-primary);
+    }
+    
+    /* File Input */
+    .form-group input[type="file"] {
+        padding: 10px;
+        border: 2px solid var(--input-border);
+        border-radius: 5px;
+        width: 100%;
+        font-size: 14px;
+        background: var(--input-bg);
+        color: var(--input-text);
+        cursor: pointer;
+    }
+    
+    .form-group input[type="file"]:hover {
+        border-color: #2196f3;
+    }
+    
+    .form-group input[type="file"]:focus {
+        outline: none;
+        border-color: #2196f3;
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+    }
+    
+    /* Buttons */
+    .button-group {
+        display: flex;
+        gap: 15px;
+        margin-top: 30px;
+    }
+    
+    .btn-submit {
+        background: #4caf50;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+    }
+    
+    .btn-submit:hover {
+        background: #45a049;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+    }
+    
+    .btn-cancel {
+        background: #757575;
+        color: white;
+        padding: 12px 30px;
+        border-radius: 5px;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        font-weight: bold;
+        transition: all 0.2s;
+    }
+    
+    .btn-cancel:hover {
+        background: #616161;
+        transform: translateY(-1px);
+        text-decoration: none;
+        color: white;
+    }
+    
+    /* Examples Section */
+    .examples-section {
+        background: var(--bg-secondary);
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 30px;
+    }
+    
+    .examples-section h3 {
+        color: var(--text-primary);
+        margin-bottom: 15px;
+    }
+    
+    /* Column Descriptions List */
+    .info-box ul {
+        line-height: 1.8;
+        padding-left: 20px;
+    }
+    
+    .info-box li strong {
+        color: #2196f3;
+    }
+    
+    .warning-box ul {
+        line-height: 1.8;
+        padding-left: 20px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="padding: 20px; max-width: 900px;">
+<div class="upload-container">
     <h1>📤 Bulk Upload Stock Records</h1>
     
-    <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
-        <h3 style="margin-top: 0;">📋 CSV Format Required</h3>
+    <div class="info-box">
+        <h3>📋 CSV Format Required</h3>
         <p><strong>Your CSV file must have these columns (exact names):</strong></p>
-        <pre style="background: white; padding: 15px; border-radius: 5px; overflow-x: auto;">sku,warehouse,quantity,reorder_level
+        <pre>sku,warehouse,quantity,reorder_level
 WINE-001,Ethnic World Padova,45,10
 WINE-001,Ethnic World Vicenza,32,10
 WINE-002,Ethnic World Padova,67,15
 BEER-001,Ethnic World Conegliano,120,20</pre>
         
         <h4>Column Descriptions:</h4>
-        <ul style="line-height: 1.8;">
+        <ul>
             <li><strong>sku</strong> - Product SKU (must exist in products)</li>
             <li><strong>warehouse</strong> - Warehouse name (must match existing warehouse)</li>
             <li><strong>quantity</strong> - Current stock quantity</li>
@@ -22,9 +254,9 @@ BEER-001,Ethnic World Conegliano,120,20</pre>
         </ul>
     </div>
     
-    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-        <h4 style="margin-top: 0;">💡 Important Notes</h4>
-        <ul style="line-height: 1.8;">
+    <div class="warning-box">
+        <h4>💡 Important Notes</h4>
+        <ul>
             <li>Products must be uploaded BEFORE uploading stock</li>
             <li>Warehouse names must match exactly (partial match is okay)</li>
             <li>If stock record exists, quantity will be UPDATED (not added)</li>
@@ -32,34 +264,31 @@ BEER-001,Ethnic World Conegliano,120,20</pre>
         </ul>
     </div>
     
-    <form method="post" enctype="multipart/form-data" style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <form method="post" enctype="multipart/form-data" class="form-container">
         {% csrf_token %}
         
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+        <div class="form-group">
+            <label for="csv_file">
                 Select CSV File:
             </label>
-            <input type="file" name="csv_file" accept=".csv" required 
-                   style="padding: 10px; border: 2px solid #ddd; border-radius: 5px; width: 100%; font-size: 14px;">
+            <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
         </div>
         
-        <div style="display: flex; gap: 15px; margin-top: 30px;">
-            <button type="submit" 
-                    style="background: #4caf50; color: white; padding: 12px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold;">
+        <div class="button-group">
+            <button type="submit" class="btn-submit">
                 📤 Upload Stock Records
             </button>
             
-            <a href="{% url 'admin:inventory_stock_changelist' %}" 
-               style="background: #757575; color: white; padding: 12px 30px; border-radius: 5px; text-decoration: none; display: inline-block; font-size: 16px; font-weight: bold;">
+            <a href="{% url 'admin:inventory_stock_changelist' %}" class="btn-cancel">
                 ← Cancel
             </a>
         </div>
     </form>
     
-    <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 30px;">
+    <div class="examples-section">
         <h3>📥 Sample CSV File</h3>
         
-        <pre style="background: white; padding: 15px; border-radius: 5px; margin-top: 10px; font-size: 12px;">sku,warehouse,quantity,reorder_level
+        <pre>sku,warehouse,quantity,reorder_level
 WINE-BAR-2015,Ethnic World Padova,25,5
 WINE-BAR-2015,Ethnic World Vicenza,18,5
 WINE-BAR-2015,Ethnic World Conegliano,12,5
@@ -71,21 +300,9 @@ BEER-LAG-001,Ethnic World Conegliano,98,20
 TEX-SARI-BLU,Ethnic World Padova,33,8
 FOOD-RICE-5KG,Ethnic World Padova,156,30</pre>
         
-        <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 5px;">
+        <div class="success-box" style="margin-top: 20px;">
             <strong>✅ Pro Tip:</strong> Export your current stock to see the format, then modify the quantities and re-upload!
         </div>
     </div>
 </div>
-
-<style>
-    button:hover {
-        opacity: 0.9;
-        transform: translateY(-1px);
-        transition: all 0.2s;
-    }
-    
-    a:hover {
-        opacity: 0.9;
-    }
-</style>
 {% endblock %}
