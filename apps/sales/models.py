@@ -135,7 +135,7 @@ class Order(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer = models.ForeignKey('Customer', on_delete=models.CASCADE)
+    customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='orders')
     warehouse = models.ForeignKey('inventory.Warehouse', on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -144,16 +144,17 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_locked = models.BooleanField(default=False)
     
-    # Track who created the order
+    # Track who created the order - MATCHES YOUR MIGRATION!
     created_by = models.ForeignKey(
         'accounts.User', 
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True,
-        related_name='orders_created'
+        related_name='created_%(class)s'  # ✅ Correct!
     )
     
     class Meta:
+        db_table = 'orders'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -179,7 +180,6 @@ class Order(models.Model):
         
         # Check if user has warehouse restrictions
         if user and hasattr(user, 'assigned_warehouse') and user.assigned_warehouse:
-            # User is restricted to their warehouse
             user_can_see_details = False
         
         for item in items:
@@ -399,6 +399,9 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     
+    class Meta:
+        db_table = 'order_items'
+    
     def save(self, *args, **kwargs):
         """Calculate subtotal automatically"""
         self.subtotal = self.quantity * self.price
@@ -417,6 +420,11 @@ class Customer(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)  # ✅ Your migration has this!
+    
+    class Meta:
+        db_table = 'customers'
+        ordering = ['-created_at']
     
     def __str__(self):
         return self.name
