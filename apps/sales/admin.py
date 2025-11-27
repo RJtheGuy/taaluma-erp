@@ -223,7 +223,6 @@
 #     search_fields = ['order__id', 'product__name']
 #     readonly_fields = ['subtotal']
 
-
 # apps/sales/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
@@ -249,7 +248,7 @@ class OrderAdmin(admin.ModelAdmin):
     ]
     list_filter = ['status', 'warehouse', 'created_at']
     search_fields = ['customer__name', 'customer__email', 'id']
-    readonly_fields = ['total', 'created_at', 'updated_at', 'is_locked', 'created_by']
+    readonly_fields = ['total', 'created_at', 'updated_at', 'is_locked']  # ← FIXED!
     inlines = [OrderItemInline]
     
     fieldsets = (
@@ -264,7 +263,7 @@ class OrderAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('System Info', {
-            'fields': ('is_locked', 'created_by', 'created_at', 'updated_at'),
+            'fields': ('is_locked', 'created_at', 'updated_at'),  # ← FIXED!
             'classes': ('collapse',)
         }),
     )
