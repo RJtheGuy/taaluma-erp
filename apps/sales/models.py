@@ -120,45 +120,62 @@
 # apps/sales/models.py
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
-from apps.inventory.models import Stock
-from decimal import Decimal
-import uuid
+from apps.core.models import BaseModel
+from apps.inventory.models import Product, Warehouse, Stock
 
 
-class Order(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('confirmed', 'Confirmed'),
-        ('shipped', 'Shipped'),
-        ('delivered', 'Delivered'),
-        ('cancelled', 'Cancelled'),
-    ]
+class Customer(BaseModel):
+    name = models.CharField(max_length=255)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
     
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='orders')
-    warehouse = models.ForeignKey('inventory.Warehouse', on_delete=models.CASCADE)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    is_locked = models.BooleanField(default=False)
+    class Meta:
+        db_table = 'customers'
+        ordering = ['-created_at']
     
-    # Track who created the order - MATCHES YOUR MIGRATION!
-    created_by = models.ForeignKey(
-        'accounts.User', 
+    def __str__(self):
+        return self.name
+
+
+class Order(BaseModel):
+    customer = models.ForeignKey(
+        Customer, 
         on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='created_%(class)s'  # ✅ Correct!
+        null=True,
+        related_name='orders'
     )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='orders',
+        help_text="Warehouse fulfilling this order"
+    )
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    status = models.CharField(
+        max_length=50,
+        choices=[
+            ('pending', 'Pending'),
+            ('confirmed', 'Confirmed'),
+            ('shipped', 'Shipped'),
+            ('delivered', 'Delivered'),
+            ('cancelled', 'Cancelled'),
+        ],
+        default='pending'
+    )
+    notes = models.TextField(blank=True, null=True)
+    
+    # NEW FIELD - Stock validation locking
+    is_locked = models.BooleanField(default=False)
     
     class Meta:
         db_table = 'orders'
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"Order {str(self.id)[:8]} - {self.customer.name}"
+        return f"Order #{str(self.id)[:8]} - {self.customer.name if self.customer else 'No Customer'}"
     
     def clean(self, user=None):
         """
@@ -312,20 +329,19 @@ class Order(models.Model):
     
     def save(self, *args, user=None, **kwargs):
         """
-        Override save to validate stock and track creator
+        Override save to validate stock
         """
-        # Track creator
-        if not self.pk and user:
-            self.created_by = user
-        
         # Check if order is locked
         if self.pk:
-            old_order = Order.objects.get(pk=self.pk)
-            if old_order.is_locked and old_order.status != self.status:
-                raise ValidationError(
-                    f"❌ Cannot modify order {str(self.id)[:8]} - "
-                    f"Order is locked (status: {old_order.get_status_display()})"
-                )
+            try:
+                old_order = Order.objects.get(pk=self.pk)
+                if old_order.is_locked and old_order.status != self.status:
+                    raise ValidationError(
+                        f"❌ Cannot modify order {str(self.id)[:8]} - "
+                        f"Order is locked (status: {old_order.get_status_display()})"
+                    )
+            except Order.DoesNotExist:
+                pass
         
         # Run validation (checks stock availability)
         self.clean(user=user)
@@ -347,9 +363,9 @@ class Order(models.Model):
             Order.objects.filter(pk=self.pk).update(total=total)
     
     def deduct_stock(self):
-        """Deduct stock when order is confirmed"""
-        if self.status != 'confirmed':
-            return
+        """Deduct stock from warehouse when order is confirmed"""
+        if not self.warehouse:
+            return False
         
         with transaction.atomic():
             for item in self.items.all():
@@ -367,14 +383,16 @@ class Order(models.Model):
                     
                     stock.quantity -= item.quantity
                     stock.save()
-                
                 except Stock.DoesNotExist:
-                    raise ValidationError(
-                        f"❌ Stock record not found for {item.product.name}"
-                    )
+                    pass
+        
+        return True
     
     def restore_stock(self):
-        """Restore stock when order is cancelled or deleted"""
+        """Restore stock to warehouse when order is cancelled"""
+        if not self.warehouse:
+            return False
+        
         with transaction.atomic():
             for item in self.items.all():
                 try:
@@ -385,46 +403,29 @@ class Order(models.Model):
                     stock.quantity += item.quantity
                     stock.save()
                 except Stock.DoesNotExist:
-                    Stock.objects.create(
-                        product=item.product,
-                        warehouse=self.warehouse,
-                        quantity=item.quantity
-                    )
+                    pass
+        
+        return True
 
 
-class OrderItem(models.Model):
-    order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey('inventory.Product', on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
+class OrderItem(BaseModel):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     
     class Meta:
         db_table = 'order_items'
     
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity}"
+    
     def save(self, *args, **kwargs):
-        """Calculate subtotal automatically"""
+        """Auto-calculate subtotal before saving"""
         self.subtotal = self.quantity * self.price
         super().save(*args, **kwargs)
         
+        # Update order total
         if self.order_id:
             self.order.calculate_total()
-    
-    def __str__(self):
-        return f"{self.product.name} x {self.quantity}"
-
-
-class Customer(models.Model):
-    name = models.CharField(max_length=200)
-    email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=20, blank=True)
-    address = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)  # ✅ Your migration has this!
-    
-    class Meta:
-        db_table = 'customers'
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return self.name
