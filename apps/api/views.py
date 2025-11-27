@@ -181,8 +181,8 @@ class StockViewSet(viewsets.ModelViewSet):
 
 class CustomerViewSet(viewsets.ModelViewSet):
     """Customer management"""
-    # queryset = Customer.objects.filter(is_active=True)
-    queryset = Customer.objects.all()
+    queryset = Customer.objects.filter(is_active=True)
+    # queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated, CanManageSales]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
