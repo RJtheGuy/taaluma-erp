@@ -166,6 +166,9 @@ class Order(BaseModel):
     )
     notes = models.TextField(blank=True, null=True)
     
+    # Keep this field for database compatibility (not used in logic)
+    is_locked = models.BooleanField(default=False)
+    
     class Meta:
         db_table = 'orders'
         ordering = ['-created_at']
