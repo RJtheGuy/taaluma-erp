@@ -116,7 +116,6 @@
 #         self.subtotal = self.quantity * self.price
 #         super().save(*args, **kwargs)
 
-
 # apps/sales/models.py
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
@@ -167,9 +166,6 @@ class Order(BaseModel):
     )
     notes = models.TextField(blank=True, null=True)
     
-    # NEW FIELD - Stock validation locking
-    is_locked = models.BooleanField(default=False)
-    
     class Meta:
         db_table = 'orders'
         ordering = ['-created_at']
@@ -187,7 +183,8 @@ class Order(BaseModel):
         # Only validate stock for confirmed orders
         if self.status != 'confirmed':
             return
-
+        
+        # Skip validation for new orders (no items yet)
         if not self.pk:
             return
         
@@ -334,24 +331,8 @@ class Order(BaseModel):
         """
         Override save to validate stock
         """
-        # Check if order is locked
-        if self.pk:
-            try:
-                old_order = Order.objects.get(pk=self.pk)
-                if old_order.is_locked and old_order.status != self.status:
-                    raise ValidationError(
-                        f"❌ Cannot modify order {str(self.id)[:8]} - "
-                        f"Order is locked (status: {old_order.get_status_display()})"
-                    )
-            except Order.DoesNotExist:
-                pass
-        
         # Run validation (checks stock availability)
         self.clean(user=user)
-        
-        # Lock order if confirmed/shipped/delivered
-        if self.status in ['confirmed', 'shipped', 'delivered']:
-            self.is_locked = True
         
         super().save(*args, **kwargs)
         
