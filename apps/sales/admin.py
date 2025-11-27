@@ -181,7 +181,17 @@ class OrderAdmin(admin.ModelAdmin):
             )
             return
         
-        instances = formset.save(commit=True)
+        # Save items (commit=False to get instances, but we still need to save them)
+        instances = formset.save(commit=False)
+        
+        # Save each instance
+        for instance in instances:
+            instance.save()
+        
+        # Handle deletions
+        formset.save_m2m()
+        for obj in formset.deleted_objects:
+            obj.delete()
         
         order.calculate_total()
         
@@ -200,6 +210,9 @@ class OrderAdmin(admin.ModelAdmin):
                         level='success'
                     )
                 except ValidationError as e:
+                    # Stock validation failed - DELETE the order and all items
+                    order.items.all().delete()
+                    order.delete()
                     self.message_user(request, str(e.message), level='error')
                     return
             else:
@@ -216,6 +229,9 @@ class OrderAdmin(admin.ModelAdmin):
                         level='success'
                     )
                 except ValidationError as e:
+                    # Stock validation failed - ROLLBACK status change
+                    order.status = old_status
+                    order.save()
                     self.message_user(request, str(e.message), level='error')
                     return
             else:
@@ -246,6 +262,7 @@ class OrderItemAdmin(admin.ModelAdmin):
     list_filter = ['order__status', 'created_at']
     search_fields = ['order__id', 'product__name']
     readonly_fields = ['subtotal']
+
 
 # # apps/sales/admin.py
 # from django.contrib import admin
