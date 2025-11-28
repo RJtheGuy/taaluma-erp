@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'drf_yasg',
     
     # Local apps
-    'apps.accounts',
     'apps.core',
     'apps.accounts',
     'apps.inventory',
