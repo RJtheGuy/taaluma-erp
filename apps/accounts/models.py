@@ -25,76 +25,83 @@
 
 #     def __str__(self):
 #         return self.username
-# apps/inventory/models.py
+# apps/accounts/models.py
+from django.contrib.auth.models import AbstractUser
 from django.db import models
-from apps.core.models import TrackableModel
+from apps.core.models import BaseModel
 
 
-class Warehouse(TrackableModel):
-    """Warehouse/storage location"""
-    name = models.CharField(max_length=255)
-    location = models.CharField(max_length=255)
+class Organization(BaseModel):
+    """Organization/Company - each client is one organization"""
+    name = models.CharField(max_length=255, help_text="Client company name")
+    slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
     is_active = models.BooleanField(default=True)
     
-    # ORGANIZATION - Links warehouse to client
+    contact_email = models.EmailField(null=True, blank=True)
+    contact_phone = models.CharField(max_length=20, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    
+    subscription_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('trial', 'Trial'),
+            ('active', 'Active'),
+            ('suspended', 'Suspended'),
+            ('cancelled', 'Cancelled'),
+        ],
+        default='trial'
+    )
+    monthly_fee = models.DecimalField(max_digits=10, decimal_places=2, default=300.00)
+    trial_end_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'organizations'
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+    
+    @property
+    def warehouse_count(self):
+        return self.warehouses.count()
+    
+    @property
+    def user_count(self):
+        return self.users.count()
+
+
+class User(AbstractUser, BaseModel):
+    """Custom user model"""
+    phone = models.CharField(max_length=20, null=True, blank=True)
+    role = models.CharField(
+        max_length=50, 
+        default="staff",
+        choices=[
+            ('admin', 'Administrator'),
+            ('manager', 'Manager'),
+            ('staff', 'Staff'),
+        ]
+    )
+    
     organization = models.ForeignKey(
-        'accounts.Organization',
+        Organization,
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='warehouses',
-        help_text="Organization that owns this warehouse"
+        related_name='users'
+    )
+    
+    assigned_warehouse = models.ForeignKey(
+        'inventory.Warehouse',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_users'
     )
     
     class Meta:
-        db_table = "warehouses"
-        ordering = ['name']
+        db_table = "users"
     
     def __str__(self):
-        if self.organization:
-            return f"{self.name} ({self.organization.name})"
-        return self.name
-
-
-class Product(TrackableModel):
-    """Product master data"""
-    name = models.CharField(max_length=255)
-    sku = models.CharField(max_length=100, unique=True)
-    category = models.CharField(max_length=100)
-    cost_price = models.DecimalField(max_digits=10, decimal_places=2)
-    selling_price = models.DecimalField(max_digits=10, decimal_places=2)
-    description = models.TextField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    
-    class Meta:
-        db_table = "products"
-        ordering = ['name']
-    
-    def __str__(self):
-        return f"{self.name} ({self.sku})"
-
-
-class Stock(TrackableModel):
-    """Stock levels per warehouse"""
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="stocks")
-    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name="stocks")
-    quantity = models.IntegerField(default=0)
-    reorder_level = models.IntegerField(default=10)
-    
-    class Meta:
-        db_table = "stocks"
-        unique_together = ["product", "warehouse"]
-        ordering = ['warehouse', 'product']
-    
-    def __str__(self):
-        return f"{self.product.name} @ {self.warehouse.name}: {self.quantity}"
-    
-    @property
-    def stock_status(self):
-        """Return stock status for display"""
-        if self.quantity <= 0:
-            return "out_of_stock"
-        elif self.quantity <= self.reorder_level:
-            return "low_stock"
-        else:
-            return "in_stock"
+        return self.username
