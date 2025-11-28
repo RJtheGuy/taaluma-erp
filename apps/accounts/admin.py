@@ -47,16 +47,11 @@ class OrganizationAdmin(admin.ModelAdmin):
             'fields': ('notes',),
             'classes': ('collapse',)
         }),
-        ('System Info', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
     )
     
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = []
     
     def subscription_status_display(self, obj):
-        """Display subscription status with color"""
         colors = {
             'trial': '#ff9800',
             'active': '#4caf50',
@@ -74,13 +69,11 @@ class OrganizationAdmin(admin.ModelAdmin):
     subscription_status_display.short_description = 'Status'
     
     def warehouse_count(self, obj):
-        """Display number of warehouses"""
         count = obj.warehouse_count
         return format_html('<strong>{}</strong> warehouses', count)
     warehouse_count.short_description = 'Warehouses'
     
     def user_count(self, obj):
-        """Display number of users"""
         count = obj.user_count
         return format_html('<strong>{}</strong> users', count)
     user_count.short_description = 'Users'
@@ -109,7 +102,7 @@ class UserAdmin(BaseUserAdmin):
             'classes': ('collapse',)
         }),
         ('Important Dates', {
-            'fields': ('last_login', 'date_joined', 'created_at', 'updated_at'),
+            'fields': ('last_login', 'date_joined'),
             'classes': ('collapse',)
         }),
     )
@@ -121,10 +114,9 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
     
-    readonly_fields = ['last_login', 'date_joined', 'created_at', 'updated_at']
+    readonly_fields = ['last_login', 'date_joined']
     
     def get_queryset(self, request):
-        """Superuser sees all users, others see only their organization"""
         qs = super().get_queryset(request)
         
         if request.user.is_superuser:
@@ -136,7 +128,6 @@ class UserAdmin(BaseUserAdmin):
         return qs.none()
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Filter warehouse choices by user's organization"""
         if db_field.name == "assigned_warehouse" and not request.user.is_superuser:
             if hasattr(request.user, 'organization') and request.user.organization:
                 from apps.inventory.models import Warehouse
@@ -144,4 +135,5 @@ class UserAdmin(BaseUserAdmin):
                     organization=request.user.organization
                 )
         
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
