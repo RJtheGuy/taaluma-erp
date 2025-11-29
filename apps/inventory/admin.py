@@ -116,7 +116,6 @@
 #                 kwargs["queryset"] = Warehouse.objects.filter(id=request.user.assigned_warehouse.id)
         
 #         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
 # apps/inventory/admin.py
 from django.contrib import admin
 from django.urls import path
