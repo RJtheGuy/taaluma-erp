@@ -117,9 +117,9 @@
         
 #         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-
 # apps/inventory/admin.py
 from django.contrib import admin
+from django.urls import path
 from django.utils.html import format_html
 from apps.core.admin import OrganizationFilterMixin
 from .models import Warehouse, Product, Stock
@@ -164,6 +164,9 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_filter = ['is_active', 'category', 'created_at']
     search_fields = ['name', 'sku', 'category']
     
+    # BULK UPLOAD TEMPLATE
+    change_list_template = 'admin/inventory/product_changelist.html'
+    
     fieldsets = (
         ('Product Information', {
             'fields': ('name', 'sku', 'category', 'description', 'is_active')
@@ -178,6 +181,19 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     )
     
     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
+    
+    def get_urls(self):
+        """Add bulk upload URL"""
+        urls = super().get_urls()
+        custom_urls = [
+            path('bulk-upload/', self.admin_site.admin_view(self.bulk_upload_view), name='inventory_product_bulk_upload'),
+        ]
+        return custom_urls + urls
+    
+    def bulk_upload_view(self, request):
+        """Handle bulk upload"""
+        from apps.inventory.views import bulk_upload_products
+        return bulk_upload_products(request)
     
     def profit_margin(self, obj):
         """Calculate and display profit margin"""
@@ -206,6 +222,9 @@ class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_filter = ['warehouse', 'created_at']
     search_fields = ['product__name', 'product__sku', 'warehouse__name']
     
+    # BULK UPLOAD TEMPLATE
+    change_list_template = 'admin/inventory/stock_changelist.html'
+    
     fieldsets = (
         ('Stock Information', {
             'fields': ('product', 'warehouse', 'quantity', 'reorder_level')
@@ -217,6 +236,19 @@ class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     )
     
     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
+    
+    def get_urls(self):
+        """Add bulk upload URL"""
+        urls = super().get_urls()
+        custom_urls = [
+            path('bulk-upload/', self.admin_site.admin_view(self.bulk_upload_view), name='inventory_stock_bulk_upload'),
+        ]
+        return custom_urls + urls
+    
+    def bulk_upload_view(self, request):
+        """Handle bulk upload"""
+        from apps.inventory.views import bulk_upload_stock
+        return bulk_upload_stock(request)
     
     def quantity_display(self, obj):
         """Display quantity with color coding"""
