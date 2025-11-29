@@ -236,20 +236,8 @@ class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     
     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
     
-    # def get_urls(self):
-    #     """Add bulk upload URL"""
-    #     urls = super().get_urls()
-    #     custom_urls = [
-    #         path('bulk-upload/', self.admin_site.admin_view(self.bulk_upload_view), name='inventory_stock_bulk_upload'),
-    #     ]
-    #     return custom_urls + urls
-    
-    # def bulk_upload_view(self, request):
-    #     """Handle bulk upload"""
-    #     from apps.inventory.views import bulk_upload_stock
-    #     return bulk_upload_stock(request)
-
     def get_urls(self):
+        """Add bulk upload URL"""
         urls = super().get_urls()
         custom_urls = [
             path('bulk-upload/', self.admin_site.admin_view(self.bulk_upload_view), name='inventory_stock_bulk_upload'),
@@ -257,9 +245,9 @@ class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         return custom_urls + urls
     
     def bulk_upload_view(self, request):
+        """Handle bulk upload"""
         from apps.inventory.views import bulk_upload_stock
         return bulk_upload_stock(request)
-    
     
     def quantity_display(self, obj):
         """Display quantity with color coding"""
