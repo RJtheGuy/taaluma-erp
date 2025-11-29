@@ -250,7 +250,7 @@ class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     #     return bulk_upload_stock(request)
 
     def get_urls(self):
-         urls = super().get_urls()
+        urls = super().get_urls()
         custom_urls = [
             path('bulk-upload/', self.admin_site.admin_view(self.bulk_upload_view), name='inventory_stock_bulk_upload'),
         ]
