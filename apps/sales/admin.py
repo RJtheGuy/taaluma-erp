@@ -262,6 +262,7 @@
 #     list_filter = ['order__status', 'created_at']
 #     search_fields = ['order__id', 'product__name']
 #     readonly_fields = ['subtotal']
+
 # apps/sales/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
@@ -287,6 +288,25 @@ class OrderItemInline(admin.TabularInline):
         """Make ALL fields readonly for confirmed orders"""
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
             return ['product', 'quantity', 'price', 'subtotal']
+        return ['subtotal']
+    
+    def get_fields(self, request, obj=None):
+        """For confirmed orders, show custom read-only product field"""
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return ['product_display', 'quantity', 'price', 'subtotal']
+        return ['product', 'quantity', 'price', 'subtotal']
+    
+    def product_display(self, obj):
+        """Display product name as plain text (no link)"""
+        if obj and obj.product:
+            return format_html('<span>{}</span>', obj.product.name)
+        return '-'
+    product_display.short_description = 'Product'
+    
+    # Make it explicitly readonly
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return ['product_display', 'quantity', 'price', 'subtotal']
         return ['subtotal']
     
     def has_add_permission(self, request, obj=None):
@@ -315,26 +335,53 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     search_fields = ['customer__name', 'id']
     inlines = [OrderItemInline]
     
-    def get_readonly_fields(self, request, obj=None):
-        """Make ALL fields read-only for confirmed/shipped/delivered orders"""
+    def get_fields(self, request, obj=None):
+        """
+        Use different fields for confirmed orders
+        Display custom read-only fields without clickable links
+        """
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
-            return ['customer', 'warehouse', 'status', 'notes', 'total']
+            return ['customer_display', 'warehouse_display', 'status', 'notes', 'total']
+        return ['customer', 'warehouse', 'status', 'notes', 'total']
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make fields read-only for confirmed orders"""
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return ['customer_display', 'warehouse_display', 'status', 'notes', 'total']
         return ['total']
+    
+    def customer_display(self, obj):
+        """Display customer name as plain text (no clickable link)"""
+        if obj and obj.customer:
+            return format_html(
+                '<strong>{}</strong><br>'
+                '<small style="color: #666;">Email: {}</small><br>'
+                '<small style="color: #666;">Phone: {}</small>',
+                obj.customer.name,
+                obj.customer.email or 'N/A',
+                obj.customer.phone or 'N/A'
+            )
+        return '-'
+    customer_display.short_description = 'Customer'
+    
+    def warehouse_display(self, obj):
+        """Display warehouse name as plain text (no clickable link)"""
+        if obj and obj.warehouse:
+            return format_html(
+                '<strong>{}</strong><br>'
+                '<small style="color: #666;">Location: {}</small>',
+                obj.warehouse.name,
+                obj.warehouse.location or 'N/A'
+            )
+        return '-'
+    warehouse_display.short_description = 'Warehouse'
     
     def get_fieldsets(self, request, obj=None):
         """Show warning message for confirmed orders"""
-        fieldsets = [
-            ('Order Information', {
-                'fields': ('customer', 'warehouse', 'status', 'notes')
-            }),
-            ('Financial', {
-                'fields': ('total',)
-            }),
-        ]
-        
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
-            fieldsets.insert(0, (
-                None, {
+            # Confirmed order - use display fields
+            fieldsets = [
+                (None, {
                     'fields': (),
                     'description': format_html(
                         '<div style="background: #fff3cd; border: 2px solid #ffc107; '
@@ -346,8 +393,24 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                         '</div>',
                         obj.get_status_display()
                     )
-                }
-            ))
+                }),
+                ('Order Information', {
+                    'fields': ('customer_display', 'warehouse_display', 'status', 'notes')
+                }),
+                ('Financial', {
+                    'fields': ('total',)
+                }),
+            ]
+        else:
+            # Pending/cancelled order - use normal fields
+            fieldsets = [
+                ('Order Information', {
+                    'fields': ('customer', 'warehouse', 'status', 'notes')
+                }),
+                ('Financial', {
+                    'fields': ('total',)
+                }),
+            ]
         
         return fieldsets
     
@@ -375,7 +438,6 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                 extra_context['show_save'] = False
                 extra_context['show_save_and_continue'] = False
                 extra_context['show_save_and_add_another'] = False
-                # Still allow viewing
                 extra_context['title'] = f'View Order (Read-Only)'
         except:
             pass
