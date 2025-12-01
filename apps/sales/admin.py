@@ -262,14 +262,13 @@
 #     list_filter = ['order__status', 'created_at']
 #     search_fields = ['order__id', 'product__name']
 #     readonly_fields = ['subtotal']
-
 # apps/sales/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
 from django.core.exceptions import ValidationError
+from django.contrib import messages
 from apps.core.admin import OrganizationFilterMixin
 from .models import Customer, Order, OrderItem
-
 
 @admin.register(Customer)
 class CustomerAdmin(OrganizationFilterMixin, admin.ModelAdmin):
@@ -284,14 +283,26 @@ class OrderItemInline(admin.TabularInline):
     fields = ['product', 'quantity', 'price', 'subtotal']
     readonly_fields = ['subtotal']
     
+    def get_readonly_fields(self, request, obj=None):
+        """Make ALL fields readonly for confirmed orders"""
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return ['product', 'quantity', 'price', 'subtotal']
+        return ['subtotal']
+    
+    def has_add_permission(self, request, obj=None):
+        """Prevent adding items to confirmed orders"""
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return False
+        return super().has_add_permission(request, obj)
+    
     def has_change_permission(self, request, obj=None):
-        """Prevent editing items on confirmed/shipped/delivered orders"""
+        """Prevent editing items on confirmed orders"""
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
             return False
         return super().has_change_permission(request, obj)
     
     def has_delete_permission(self, request, obj=None):
-        """Prevent deleting items on confirmed/shipped/delivered orders"""
+        """Prevent deleting items on confirmed orders"""
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
             return False
         return super().has_delete_permission(request, obj)
@@ -305,7 +316,7 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     inlines = [OrderItemInline]
     
     def get_readonly_fields(self, request, obj=None):
-        """Make all fields read-only for confirmed/shipped/delivered orders"""
+        """Make ALL fields read-only for confirmed/shipped/delivered orders"""
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
             return ['customer', 'warehouse', 'status', 'notes', 'total']
         return ['total']
@@ -326,11 +337,12 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                 None, {
                     'fields': (),
                     'description': format_html(
-                        '<div style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin-bottom: 20px;">'
-                        '<strong>⚠️ ORDER LOCKED</strong><br>'
-                        'This order is <strong>{}</strong> and cannot be modified. '
+                        '<div style="background: #fff3cd; border: 2px solid #ffc107; '
+                        'padding: 15px; border-radius: 5px; margin-bottom: 20px;">'
+                        '<strong style="color: #856404; font-size: 16px;">🔒 ORDER LOCKED</strong><br>'
+                        '<span style="color: #856404;">This order is {} and cannot be modified. '
                         'Stock has already been deducted. '
-                        'You can only <strong>delete</strong> this order (stock will be restored).'
+                        'You can only view or delete this order (stock will be restored upon deletion).</span>'
                         '</div>',
                         obj.get_status_display()
                     )
@@ -340,26 +352,44 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         return fieldsets
     
     def has_change_permission(self, request, obj=None):
-        """Allow viewing but prevent editing confirmed/shipped/delivered orders"""
+        """
+        CRITICAL: Prevent editing confirmed orders entirely
+        Return False to disable the save buttons
+        """
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            # Allow viewing but not changing
+            return False
         return super().has_change_permission(request, obj)
     
     def has_delete_permission(self, request, obj=None):
-        """Allow deletion of confirmed orders (stock will be restored)"""
-        if not super().has_delete_permission(request, obj):
-            return False
+        """Allow deletion of any order (stock will be restored)"""
+        return super().has_delete_permission(request, obj)
+    
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        """Override change view to allow viewing confirmed orders"""
+        extra_context = extra_context or {}
         
-        # Check warehouse access (handled by OrganizationFilterMixin)
-        return True
+        try:
+            obj = self.get_object(request, object_id)
+            if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+                extra_context['show_save'] = False
+                extra_context['show_save_and_continue'] = False
+                extra_context['show_save_and_add_another'] = False
+                # Still allow viewing
+                extra_context['title'] = f'View Order (Read-Only)'
+        except:
+            pass
+        
+        return super().change_view(request, object_id, form_url, extra_context)
     
     def delete_model(self, request, obj):
         """When deleting order, restore stock if it was confirmed"""
         if obj.status in ['confirmed', 'shipped', 'delivered']:
             if obj.warehouse:
                 obj.restore_stock()
-                self.message_user(
+                messages.success(
                     request,
-                    f'✅ Order deleted and stock restored to {obj.warehouse.name}',
-                    level='success'
+                    f'✅ Order deleted and stock restored to {obj.warehouse.name}'
                 )
         
         super().delete_model(request, obj)
@@ -373,24 +403,26 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         count = queryset.count()
         queryset.delete()
         
-        self.message_user(
+        messages.success(
             request,
-            f'✅ Deleted {count} orders and restored stock where applicable',
-            level='success'
+            f'✅ Deleted {count} orders and restored stock where applicable'
         )
     
     def save_model(self, request, obj, form, change):
-        # Block saving if order is already confirmed/shipped/delivered
+        """
+        CRITICAL: Block any attempts to save confirmed orders
+        This is a safety net in case form submission bypasses permissions
+        """
+        # Check if trying to modify a confirmed order
         if change and obj.pk:
             try:
                 old_order = Order.objects.get(pk=obj.pk)
                 if old_order.status in ['confirmed', 'shipped', 'delivered']:
-                    self.message_user(
+                    messages.error(
                         request,
-                        '❌ Cannot modify confirmed/shipped/delivered orders. Delete and recreate if needed.',
-                        level='error'
+                        '❌ Cannot modify confirmed/shipped/delivered orders. This order is locked.'
                     )
-                    return
+                    return  # Don't save
             except Order.DoesNotExist:
                 pass
         
@@ -398,8 +430,10 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         if not obj.warehouse and hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
             obj.warehouse = request.user.assigned_warehouse
         
+        # Track if this is a new order
         obj._is_new_order = obj.pk is None
         
+        # Track old status for stock management
         if change:
             try:
                 old_order = Order.objects.get(pk=obj.pk)
@@ -412,16 +446,16 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         super().save_model(request, obj, form, change)
     
     def save_formset(self, request, form, formset, change):
+        """Handle order items and stock deduction"""
         order = form.instance
         
-        # Block if order is confirmed/shipped/delivered
+        # CRITICAL: Block if order is confirmed
         if order.status in ['confirmed', 'shipped', 'delivered'] and change:
-            self.message_user(
+            messages.error(
                 request,
-                '❌ Cannot modify items on confirmed orders',
-                level='error'
+                '❌ Cannot modify items on confirmed orders. Order is locked.'
             )
-            return
+            return  # Don't save
         
         # Save items
         instances = formset.save(commit=False)
@@ -430,70 +464,69 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
             instance.save()
         
         # Handle deletions
-        formset.save_m2m()
         for obj in formset.deleted_objects:
             obj.delete()
         
+        formset.save_m2m()
+        
+        # Recalculate total
         order.calculate_total()
         
+        # Get status info
         new_status = order.status
         old_status = getattr(order, '_old_status', None)
         is_new = getattr(order, '_is_new_order', False)
         
-        # New order as confirmed/shipped/delivered
+        # Handle stock deduction/restoration based on status changes
         if is_new and new_status in ['confirmed', 'shipped', 'delivered']:
+            # New order created as confirmed
             if order.warehouse:
                 try:
                     order.deduct_stock()
-                    self.message_user(
+                    messages.success(
                         request,
-                        f'✅ Order created and stock deducted from {order.warehouse.name}',
-                        level='success'
+                        f'✅ Order created and stock deducted from {order.warehouse.name}'
                     )
                 except ValidationError as e:
-                    # Stock validation failed - DELETE the order and all items
+                    # Stock validation failed - DELETE the order
                     order.items.all().delete()
                     order.delete()
-                    self.message_user(request, str(e.message), level='error')
+                    messages.error(request, str(e.message))
                     return
             else:
-                self.message_user(request, '⚠️ No warehouse - stock NOT deducted', level='warning')
+                messages.warning(request, '⚠️ No warehouse assigned - stock NOT deducted')
         
-        # Pending to confirmed/shipped/delivered
         elif change and old_status == 'pending' and new_status in ['confirmed', 'shipped', 'delivered']:
+            # Pending to confirmed
             if order.warehouse:
                 try:
                     order.deduct_stock()
-                    self.message_user(
+                    messages.success(
                         request,
-                        f'✅ Order confirmed - stock deducted from {order.warehouse.name}',
-                        level='success'
+                        f'✅ Order confirmed - stock deducted from {order.warehouse.name}'
                     )
                 except ValidationError as e:
-                    # Stock validation failed - ROLLBACK status change
+                    # Stock validation failed - ROLLBACK
                     order.status = old_status
                     order.save()
-                    self.message_user(request, str(e.message), level='error')
+                    messages.error(request, str(e.message))
                     return
             else:
-                self.message_user(request, '⚠️ No warehouse assigned!', level='error')
+                messages.error(request, '⚠️ No warehouse assigned')
         
-        # To cancelled
-        elif change and old_status != 'cancelled' and new_status == 'cancelled':
+        elif change and old_status in ['confirmed', 'shipped', 'delivered'] and new_status == 'cancelled':
+            # Confirmed to cancelled - restore stock
             if order.warehouse:
                 order.restore_stock()
-                self.message_user(
+                messages.warning(
                     request,
-                    f'🔄 Order cancelled - stock restored to {order.warehouse.name}',
-                    level='warning'
+                    f'🔄 Order cancelled - stock restored to {order.warehouse.name}'
                 )
         
-        # Pending
         elif new_status == 'pending':
-            self.message_user(
+            messages.info(
                 request,
-                'ℹ️ Order saved as Pending - stock will be deducted when confirmed',
-                level='info'
+                'ℹ️ Order saved as Pending - stock will be deducted when confirmed'
             )
 
 
