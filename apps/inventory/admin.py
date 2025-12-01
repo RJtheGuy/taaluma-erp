@@ -179,7 +179,46 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         }),
     )
     
-    readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
+    readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at'] 
+
+    def get_readonly_fields(self, request, obj=None):
+        """Dynamically determine readonly fields"""
+        readonly = ['created_at', 'updated_at']
+        
+        # Only add these if model actually has them
+        if hasattr(self.model, 'created_by'):
+            readonly.append('created_by')
+        if hasattr(self.model, 'updated_by'):
+            readonly.append('updated_by')
+        
+        return readonly
+    
+    def get_fieldsets(self, request, obj=None):
+        """Dynamically build fieldsets"""
+        fieldsets = [
+            ('Product Information', {
+                'fields': ('name', 'sku', 'category', 'description', 'is_active')
+            }),
+            ('Pricing', {
+                'fields': ('cost_price', 'selling_price')
+            }),
+        ]
+        
+        # Only add System Info if fields exist
+        system_fields = []
+        for field in ['created_by', 'created_at', 'updated_by', 'updated_at']:
+            if hasattr(self.model, field):
+                system_fields.append(field)
+        
+        if system_fields:
+            fieldsets.append(
+                ('System Info', {
+                    'fields': tuple(system_fields),
+                    'classes': ('collapse',)
+                })
+            )
+        
+        return fieldsets
     
     def get_urls(self):
         """Add bulk upload URL"""
