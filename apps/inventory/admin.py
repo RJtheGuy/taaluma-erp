@@ -157,7 +157,7 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         'category', 
         'cost_price', 
         'selling_price',
-        'profit_margin',
+        # 'profit_margin',
         'is_active'
     ]
     list_filter = ['is_active', 'category', 'created_at']
@@ -233,18 +233,18 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         from apps.inventory.views import bulk_upload_products
         return bulk_upload_products(request)
     
-    def profit_margin(self, obj):
-        """Calculate and display profit margin"""
-        if obj.cost_price > 0:
-            margin = ((obj.selling_price - obj.cost_price) / obj.cost_price) * 100
-            color = '#4caf50' if margin > 30 else '#ff9800' if margin > 10 else '#f44336'
-            return format_html(
-                '<span style="color: {}; font-weight: bold;">{:.1f}%</span>',
-                color,
-                margin
-            )
-        return '-'
-    profit_margin.short_description = 'Margin'
+    # def profit_margin(self, obj):
+    #     """Calculate and display profit margin"""
+    #     if obj.cost_price > 0:
+    #         margin = ((obj.selling_price - obj.cost_price) / obj.cost_price) * 100
+    #         color = '#4caf50' if margin > 30 else '#ff9800' if margin > 10 else '#f44336'
+    #         return format_html(
+    #             '<span style="color: {}; font-weight: bold;">{:.1f}%</span>',
+    #             color,
+    #             margin
+    #         )
+    #     return '-'
+    # profit_margin.short_description = 'Margin'
 
 
 @admin.register(Stock)
