@@ -597,7 +597,195 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_display = ['order', 'product', 'quantity', 'price', 'subtotal']
     list_filter = ['order__status', 'created_at']
     search_fields = ['order__id', 'product__name']
-    readonly_fields = ['subtotal']
+    
+    def get_fields(self, request, obj=None):
+        """
+        Use different fields based on parent order status
+        Show plain text fields for confirmed orders
+        """
+        if obj and obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+            return ['order_display', 'product_display', 'quantity', 'price', 'subtotal']
+        return ['order', 'product', 'quantity', 'price', 'subtotal']
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make all fields readonly for confirmed order items"""
+        if obj and obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+            return ['order_display', 'product_display', 'quantity', 'price', 'subtotal']
+        return ['subtotal']
+    
+    def order_display(self, obj):
+        """Display order info as plain text (no link)"""
+        if obj and obj.order:
+            return format_html(
+                '<strong>Order #{}</strong><br>'
+                '<small style="color: #666;">Customer: {}</small><br>'
+                '<small style="color: #666;">Status: {}</small><br>'
+                '<small style="color: #666;">Total: €{}</small>',
+                str(obj.order.id)[:8],
+                obj.order.customer.name if obj.order.customer else 'N/A',
+                obj.order.get_status_display(),
+                obj.order.total
+            )
+        return '-'
+    order_display.short_description = 'Order'
+    
+    def product_display(self, obj):
+        """Display product info as plain text (no link)"""
+        if obj and obj.product:
+            return format_html(
+                '<strong>{}</strong><br>'
+                '<small style="color: #666;">SKU: {}</small><br>'
+                '<small style="color: #666;">Price: €{}</small>',
+                obj.product.name,
+                obj.product.sku or 'N/A',
+                obj.product.selling_price
+            )
+        return '-'
+    product_display.short_description = 'Product'
+    
+    def get_fieldsets(self, request, obj=None):
+        """Show warning for confirmed order items"""
+        if obj and obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+            fieldsets = [
+                (None, {
+                    'fields': (),
+                    'description': format_html(
+                        '<div style="background: #fff3cd; border: 2px solid #ffc107; '
+                        'padding: 15px; border-radius: 5px; margin-bottom: 20px;">'
+                        '<strong style="color: #856404; font-size: 16px;">🔒 ORDER ITEM LOCKED</strong><br>'
+                        '<span style="color: #856404;">This item belongs to a {} order and cannot be modified. '
+                        'Stock has already been deducted. '
+                        'You can only view or delete this item (entire order must be deleted to restore stock).</span>'
+                        '</div>',
+                        obj.order.get_status_display()
+                    )
+                }),
+                ('Order Item Details', {
+                    'fields': ('order_display', 'product_display', 'quantity', 'price', 'subtotal')
+                }),
+            ]
+        else:
+            fieldsets = [
+                ('Order Item Details', {
+                    'fields': ('order', 'product', 'quantity', 'price', 'subtotal')
+                }),
+            ]
+        
+        return fieldsets
+    
+    def has_change_permission(self, request, obj=None):
+        """Prevent editing confirmed order items"""
+        if obj and obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+            return False
+        return super().has_change_permission(request, obj)
+    
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deleting confirmed order items individually"""
+        if obj and obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+            # Don't allow deleting individual items from confirmed orders
+            # They should delete the entire order instead
+            return False
+        return super().has_delete_permission(request, obj)
+    
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        """Override change view for confirmed order items"""
+        extra_context = extra_context or {}
+        
+        try:
+            obj = self.get_object(request, object_id)
+            if obj and obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+                extra_context['show_save'] = False
+                extra_context['show_save_and_continue'] = False
+                extra_context['show_save_and_add_another'] = False
+                extra_context['show_delete'] = False
+                extra_context['title'] = f'View Order Item (Read-Only)'
+        except:
+            pass
+        
+        return super().change_view(request, object_id, form_url, extra_context)
+    
+    def save_model(self, request, obj, form, change):
+        """
+        CRITICAL: Block saving confirmed order items
+        Safety net in case form bypasses permissions
+        """
+        if change and obj.pk:
+            try:
+                old_item = OrderItem.objects.select_related('order').get(pk=obj.pk)
+                if old_item.order.status in ['confirmed', 'shipped', 'delivered']:
+                    messages.error(
+                        request,
+                        '❌ Cannot modify items from confirmed orders. This item is locked.'
+                    )
+                    return
+            except OrderItem.DoesNotExist:
+                pass
+        
+        # Check if parent order is confirmed
+        if obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+            messages.error(
+                request,
+                '❌ Cannot add/modify items to confirmed orders. The order is locked.'
+            )
+            return
+        
+        super().save_model(request, obj, form, change)
+        
+        # Recalculate order total
+        if obj.order:
+            obj.order.calculate_total()
+    
+    def delete_model(self, request, obj):
+        """Block deletion of confirmed order items"""
+        if obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
+            messages.error(
+                request,
+                '❌ Cannot delete items from confirmed orders. '
+                'Delete the entire order instead (stock will be restored).'
+            )
+            return
+        
+        # Get order before deleting item
+        order = obj.order
+        
+        super().delete_model(request, obj)
+        
+        # Recalculate order total
+        if order:
+            order.calculate_total()
+            messages.success(request, '✅ Order item deleted')
+    
+    def delete_queryset(self, request, queryset):
+        """Block bulk deletion of confirmed order items"""
+        confirmed_items = queryset.filter(
+            order__status__in=['confirmed', 'shipped', 'delivered']
+        )
+        
+        if confirmed_items.exists():
+            messages.error(
+                request,
+                f'❌ Cannot delete {confirmed_items.count()} items from confirmed orders. '
+                'Delete entire orders instead.'
+            )
+            # Only delete items from non-confirmed orders
+            queryset = queryset.exclude(
+                order__status__in=['confirmed', 'shipped', 'delivered']
+            )
+        
+        if queryset.exists():
+            orders_to_update = set(queryset.values_list('order_id', flat=True))
+            count = queryset.count()
+            queryset.delete()
+            
+            # Recalculate totals for affected orders
+            for order_id in orders_to_update:
+                try:
+                    order = Order.objects.get(pk=order_id)
+                    order.calculate_total()
+                except Order.DoesNotExist:
+                    pass
+            
+            messages.success(request, f'✅ Deleted {count} order items')
 
 # # # apps/sales/admin.py
 # # from django.contrib import admin
