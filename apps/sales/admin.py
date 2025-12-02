@@ -256,13 +256,6 @@
 #             )
 
 
-# @admin.register(OrderItem)
-# class OrderItemAdmin(admin.ModelAdmin):
-#     list_display = ['order', 'product', 'quantity', 'price', 'subtotal']
-#     list_filter = ['order__status', 'created_at']
-#     search_fields = ['order__id', 'product__name']
-#     readonly_fields = ['subtotal']
-
 # apps/sales/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
@@ -302,12 +295,6 @@ class OrderItemInline(admin.TabularInline):
             return format_html('<span>{}</span>', obj.product.name)
         return '-'
     product_display.short_description = 'Product'
-    
-    # Make it explicitly readonly
-    def get_readonly_fields(self, request, obj=None):
-        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
-            return ['product_display', 'quantity', 'price', 'subtotal']
-        return ['subtotal']
     
     def has_add_permission(self, request, obj=None):
         """Prevent adding items to confirmed orders"""
@@ -655,7 +642,7 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                         '<strong style="color: #856404; font-size: 16px;">🔒 ORDER ITEM LOCKED</strong><br>'
                         '<span style="color: #856404;">This item belongs to a {} order and cannot be modified. '
                         'Stock has already been deducted. '
-                        'You can only view or delete this item (entire order must be deleted to restore stock).</span>'
+                        'You can only view this item. To remove it, delete the entire order (stock will be restored).</span>'
                         '</div>',
                         obj.order.get_status_display()
                     )
@@ -680,11 +667,10 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
         return super().has_change_permission(request, obj)
     
     def has_delete_permission(self, request, obj=None):
-        """Prevent deleting confirmed order items individually"""
-        if obj and obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
-            # Don't allow deleting individual items from confirmed orders
-            # They should delete the entire order instead
-            return False
+        """
+        IMPORTANT: Always return True to allow CASCADE delete from parent Order
+        Block direct deletion in delete_model() and delete_queryset() instead
+        """
         return super().has_delete_permission(request, obj)
     
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -697,7 +683,7 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                 extra_context['show_save'] = False
                 extra_context['show_save_and_continue'] = False
                 extra_context['show_save_and_add_another'] = False
-                extra_context['show_delete'] = False
+                extra_context['show_delete'] = True  # Hide delete button in UI
                 extra_context['title'] = f'View Order Item (Read-Only)'
         except:
             pass
@@ -736,7 +722,11 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
             obj.order.calculate_total()
     
     def delete_model(self, request, obj):
-        """Block deletion of confirmed order items"""
+        """
+        Block DIRECT deletion of confirmed order items
+        This is called when user clicks delete button on OrderItem admin
+        CASCADE deletes from parent Order are allowed (they bypass this)
+        """
         if obj.order and obj.order.status in ['confirmed', 'shipped', 'delivered']:
             messages.error(
                 request,
@@ -756,7 +746,11 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
             messages.success(request, '✅ Order item deleted')
     
     def delete_queryset(self, request, queryset):
-        """Block bulk deletion of confirmed order items"""
+        """
+        Block DIRECT bulk deletion of confirmed order items
+        This is called when user selects items and chooses bulk delete action
+        CASCADE deletes from parent Order are allowed (they bypass this)
+        """
         confirmed_items = queryset.filter(
             order__status__in=['confirmed', 'shipped', 'delivered']
         )
@@ -786,160 +780,3 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                     pass
             
             messages.success(request, f'✅ Deleted {count} order items')
-
-# # # apps/sales/admin.py
-# # from django.contrib import admin
-# # from django.utils.html import format_html
-# # from django.contrib import messages
-# # from .models import Order, OrderItem, Customer
-
-
-# # class OrderItemInline(admin.TabularInline):
-# #     model = OrderItem
-# #     extra = 1
-# #     readonly_fields = ['subtotal']
-
-
-# # @admin.register(Order)
-# # class OrderAdmin(admin.ModelAdmin):
-# #     list_display = [
-# #         'order_id_short',
-# #         'customer',
-# #         'warehouse',
-# #         'total',
-# #         'status_display',
-# #         'created_at'
-# #     ]
-# #     list_filter = ['status', 'warehouse', 'created_at']
-# #     search_fields = ['customer__name', 'customer__email', 'id']
-# #     readonly_fields = ['is_locked','total', 'created_at', 'updated_at']  # ← FIXED!
-# #     inlines = [OrderItemInline]
-    
-# #     fieldsets = (
-# #         ('Order Information', {
-# #             'fields': ('customer', 'warehouse', 'status')
-# #         }),
-# #         ('Totals', {
-# #             'fields': ('total',)
-# #         }),
-# #         ('Notes', {
-# #             'fields': ('notes',),
-# #             'classes': ('collapse',)
-# #         }),
-# #         ('System Info', {
-# #             'fields': ('is_locked','created_at', 'updated_at'),  # ← FIXED!
-# #             'classes': ('collapse',)
-# #         }),
-# #     )
-    
-# #     def order_id_short(self, obj):
-# #         return str(obj.id)[:8]
-# #     order_id_short.short_description = 'Order ID'
-    
-# #     def total_display(self, obj):
-# #         return format_html(
-# #             '<strong style="color: #2e7d32;">€{:.2f}</strong>',
-# #             obj.total
-# #         )
-# #     total_display.short_description = 'Total'
-# #     total_display.admin_order_field = 'total'
-    
-# #     def status_display(self, obj):
-# #         colors = {
-# #             'pending': '#ff9800',
-# #             'confirmed': '#2196f3',
-# #             'shipped': '#9c27b0',
-# #             'delivered': '#4caf50',
-# #             'cancelled': '#f44336',
-# #         }
-        
-# #         icons = {
-# #             'pending': '⏳',
-# #             'confirmed': '✅',
-# #             'shipped': '📦',
-# #             'delivered': '🎉',
-# #             'cancelled': '❌',
-# #         }
-        
-# #         color = colors.get(obj.status, '#757575')
-# #         icon = icons.get(obj.status, '•')
-        
-# #         return format_html(
-# #             '<span style="background: {}; color: white; padding: 4px 12px; '
-# #             'border-radius: 12px; font-weight: bold;">{} {}</span>',
-# #             color,
-# #             icon,
-# #             obj.get_status_display().upper()
-# #         )
-# #     status_display.short_description = 'Status'
-# #     status_display.admin_order_field = 'status'
-    
-# #     def save_model(self, request, obj, form, change):
-# #         """
-# #         Custom save with user-aware validation
-# #         Passes the user to model's save method for permission checking
-# #         """
-# #         try:
-# #             # If order is being confirmed, check stock first
-# #             if obj.status == 'confirmed' and (not change or form.initial.get('status') != 'confirmed'):
-# #                 # Pass the request.user to the save method
-# #                 obj.save(user=request.user)
-                
-# #                 # Deduct stock
-# #                 obj.deduct_stock()
-                
-# #                 messages.success(
-# #                     request,
-# #                     f'✅ Order created and stock deducted from {obj.warehouse.name}'
-# #                 )
-# #             else:
-# #                 # Pass the user for tracking
-# #                 obj.save(user=request.user)
-        
-# #         except Exception as e:
-# #             # Show the error message
-# #             messages.error(request, str(e))
-# #             raise
-    
-# #     def delete_model(self, request, obj):
-# #         """Restore stock when deleting order"""
-# #         if obj.status == 'confirmed':
-# #             obj.restore_stock()
-# #             messages.success(
-# #                 request,
-# #                 f'✅ Order deleted and stock restored to {obj.warehouse.name}'
-# #             )
-        
-# #         super().delete_model(request, obj)
-    
-# #     def get_queryset(self, request):
-# #         """Filter orders based on user permissions"""
-# #         qs = super().get_queryset(request)
-        
-# #         if request.user.is_superuser:
-# #             return qs
-        
-# #         if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
-# #             return qs.filter(warehouse=request.user.assigned_warehouse)
-        
-# #         return qs
-    
-# #     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-# #         """Limit warehouse choices based on user permissions"""
-# #         if db_field.name == "warehouse":
-# #             if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
-# #                 from apps.inventory.models import Warehouse
-# #                 kwargs["queryset"] = Warehouse.objects.filter(
-# #                     id=request.user.assigned_warehouse.id
-# #                 )
-        
-# #         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-
-# # @admin.register(Customer)
-# # class CustomerAdmin(admin.ModelAdmin):
-# #     list_display = ['name', 'email', 'phone', 'created_at']
-# #     search_fields = ['name', 'email', 'phone']
-# #     readonly_fields = ['created_at']
-
-
