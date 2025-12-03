@@ -3,11 +3,12 @@ from django.core.exceptions import ValidationError
 from apps.core.models import BaseModel
 from apps.inventory.models import Product, Warehouse, Stock
 import logging
+from apps.core.models import TrackableModel 
 
 logger = logging.getLogger(__name__)
 
 
-class Customer(BaseModel):
+class Customer(TrackableModel):
     name = models.CharField(max_length=255)
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
@@ -22,7 +23,7 @@ class Customer(BaseModel):
         return self.name
 
 
-class Order(BaseModel):
+class Order(TrackableModel):
     customer = models.ForeignKey(
         Customer, 
         on_delete=models.SET_NULL, 
@@ -281,7 +282,7 @@ class Order(BaseModel):
         return True
 
 
-class OrderItem(BaseModel):
+class OrderItem(TrackableModel):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField()
