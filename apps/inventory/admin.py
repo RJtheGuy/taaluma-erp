@@ -262,6 +262,27 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     #     return '-'
     # profit_margin.short_description = 'Margin'
 
+class StockLevelFilter(admin.SimpleListFilter):
+    title = 'Stock Level'
+    parameter_name = 'stock_level'
+    
+    def lookups(self, request, model_admin):
+        return (
+            ('low', 'Low Stock'),
+            ('out', 'Out of Stock'),
+            ('ok', 'In Stock'),
+        )
+    
+    def queryset(self, request, queryset):
+        from django.db.models import F
+        if self.value() == 'low':
+            return queryset.filter(quantity__lte=F('reorder_level'))
+        if self.value() == 'out':
+            return queryset.filter(quantity=0)
+        if self.value() == 'ok':
+            return queryset.filter(quantity__gt=F('reorder_level'))
+        return queryset
+
 @admin.register(Stock)
 class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_display = [
