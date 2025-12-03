@@ -184,7 +184,16 @@ LOGGING = {
             'formatter': 'verbose',
         },
     },
+    'root': {  # ← ADD THIS to capture ALL logs
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
     'loggers': {
+        'django': {  # ← ADD THIS to capture Django errors
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'apps.sales': {
             'handlers': ['console'],
             'level': 'INFO',
