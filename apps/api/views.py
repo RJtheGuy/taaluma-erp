@@ -26,6 +26,28 @@ from .permissions import (
 
 # ============ ACCOUNTS VIEWSETS ============
 
+class WarehouseViewSet(viewsets.ModelViewSet):
+    """Warehouse CRUD"""
+    queryset = Warehouse.objects.all()
+    serializer_class = WarehouseSerializer
+    permission_classes = [IsAuthenticated, CanManageInventory]  # Keep existing
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'location']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    # ADD THIS METHOD ↓
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if hasattr(self.request.user, 'organization') and self.request.user.organization:
+            return qs.filter(organization=self.request.user.organization)
+        return qs.none()
+    
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
 class UserViewSet(viewsets.ModelViewSet):
     """User management with registration"""
     queryset = User.objects.filter(is_active=True)
@@ -99,7 +121,16 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'sku', 'description']
     ordering_fields = ['name', 'sku', 'selling_price', 'created_at']
     ordering = ['name']
-
+    
+    # ADD THIS METHOD ↓
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if hasattr(self.request.user, 'organization') and self.request.user.organization:
+            return qs.filter(created_by__organization=self.request.user.organization)
+        return qs.none()
+    
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
@@ -140,10 +171,19 @@ class StockViewSet(viewsets.ModelViewSet):
     filterset_fields = ['warehouse', 'product']
     ordering_fields = ['quantity', 'created_at']
     ordering = ['product__name']
-
+    
+    # ADD THIS METHOD ↓
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if hasattr(self.request.user, 'organization') and self.request.user.organization:
+            return qs.filter(warehouse__organization=self.request.user.organization)
+        return qs.none()
+    
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
-
+        
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
@@ -182,17 +222,25 @@ class StockViewSet(viewsets.ModelViewSet):
 class CustomerViewSet(viewsets.ModelViewSet):
     """Customer management"""
     queryset = Customer.objects.filter(is_active=True)
-    # queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated, CanManageSales]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'email', 'phone']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
-
+    
+    # ADD THIS METHOD ↓
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if hasattr(self.request.user, 'organization') and self.request.user.organization:
+            return qs.filter(created_by__organization=self.request.user.organization)
+        return qs.none()
+    
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
-
+        
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
@@ -213,7 +261,16 @@ class OrderViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status', 'customer']
     ordering_fields = ['created_at', 'total']
     ordering = ['-created_at']
-
+    
+    # ADD THIS METHOD ↓
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if hasattr(self.request.user, 'organization') and self.request.user.organization:
+            return qs.filter(warehouse__organization=self.request.user.organization)
+        return qs.none()
+    
     def get_serializer_class(self):
         if self.action == 'list':
             return OrderListSerializer
