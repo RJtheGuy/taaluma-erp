@@ -219,6 +219,22 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
             )
         
         return fieldsets
+
+    def get_queryset(self, request):
+        """
+        Products are organization-wide, not warehouse-specific
+        """
+        qs = super().get_queryset(request)
+        
+        # Superuser sees all
+        if request.user.is_superuser:
+            return qs
+        
+        # All users in organization see all organization products
+        if hasattr(request.user, 'organization') and request.user.organization:
+            return qs.filter(created_by__organization=request.user.organization)
+        
+        return qs.none()
     
     def get_urls(self):
         """Add bulk upload URL"""
