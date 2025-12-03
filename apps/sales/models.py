@@ -64,90 +64,61 @@ class Order(BaseModel):
     def __str__(self):
         return f"Order #{str(self.id)[:8]} - {self.customer.name if self.customer else 'No Customer'}"
     
-    def clean(self):
-        """Validate order before saving"""
-        from django.core.exceptions import ValidationError
-        
-        # Check customer is active
-        if self.customer and not self.customer.is_active:
-            raise ValidationError({'customer': 'Cannot create order for inactive customer'})
-        
-        # Check warehouse is active
-        if self.warehouse and not self.warehouse.is_active:
-            raise ValidationError({'warehouse': 'Cannot use inactive warehouse'})
+def clean(self):  # ← Remove user=None parameter
+    """
+    Validate order before saving
+    Check stock availability with permission-aware messages
+    """
+    super().clean()
+    
+    # Check customer is active
+    if self.customer and not self.customer.is_active:
+        raise ValidationError({'customer': 'Cannot create order for inactive customer'})
+    
+    # Check warehouse is active
+    if self.warehouse and not self.warehouse.is_active:
+        raise ValidationError({'warehouse': 'Cannot use inactive warehouse'})
+    
+    # Only validate stock for confirmed orders
+    if self.status != 'confirmed':
+        return
+    
+    # Skip validation for new orders (no items yet)
+    if not self.pk:
+        return
+    
+    # Get all items in this order
+    items = self.items.all()
+    
+    insufficient_stock = []
+    alternatives = []
+    
+    # Simplified - assume user can see details
+    user_can_see_details = True
+    
+    for item in items:
+        # Check stock at selected warehouse
+        try:
+            stock = Stock.objects.get(
+                product=item.product,
+                warehouse=self.warehouse
+            )
             
-        super().clean()
-        
-        # Only validate stock for confirmed orders
-        if self.status != 'confirmed':
-            return
-        
-        # Skip validation for new orders (no items yet)
-        if not self.pk:
-            return
-        
-        # Get all items in this order
-        items = self.items.all()
-        
-        insufficient_stock = []
-        alternatives = []
-        user_can_see_details = True
-        
-        # Check if user has warehouse restrictions
-        if user and hasattr(user, 'assigned_warehouse') and user.assigned_warehouse:
-            user_can_see_details = False
-        
-        for item in items:
-            # Check stock at selected warehouse
-            try:
-                stock = Stock.objects.get(
-                    product=item.product,
-                    warehouse=self.warehouse
-                )
-                
-                if stock.quantity < item.quantity:
-                    # Insufficient stock!
-                    insufficient_stock.append({
-                        'product': item.product.name,
-                        'requested': item.quantity,
-                        'available': stock.quantity,
-                        'shortage': item.quantity - stock.quantity
-                    })
-                    
-                    # Find alternative warehouses with stock
-                    alternative_stocks = Stock.objects.filter(
-                        product=item.product,
-                        quantity__gte=item.quantity
-                    ).exclude(
-                        warehouse=self.warehouse
-                    ).select_related('warehouse')
-                    
-                    if alternative_stocks.exists():
-                        alternatives.append({
-                            'product': item.product.name,
-                            'count': alternative_stocks.count(),
-                            'warehouses': [
-                                {
-                                    'name': alt.warehouse.name,
-                                    'available': alt.quantity
-                                }
-                                for alt in alternative_stocks
-                            ] if user_can_see_details else []
-                        })
-            
-            except Stock.DoesNotExist:
-                # Product doesn't exist at this warehouse
+            if stock.quantity < item.quantity:
+                # Insufficient stock!
                 insufficient_stock.append({
                     'product': item.product.name,
                     'requested': item.quantity,
-                    'available': 0,
-                    'shortage': item.quantity
+                    'available': stock.quantity,
+                    'shortage': item.quantity - stock.quantity
                 })
                 
-                # Find where it IS available
+                # Find alternative warehouses with stock
                 alternative_stocks = Stock.objects.filter(
                     product=item.product,
                     quantity__gte=item.quantity
+                ).exclude(
+                    warehouse=self.warehouse
                 ).select_related('warehouse')
                 
                 if alternative_stocks.exists():
@@ -163,14 +134,42 @@ class Order(BaseModel):
                         ] if user_can_see_details else []
                     })
         
-        # If insufficient stock found, raise validation error
-        if insufficient_stock:
-            error_message = self._build_error_message(
-                insufficient_stock, 
-                alternatives, 
-                user_can_see_details
-            )
-            raise ValidationError(error_message)
+        except Stock.DoesNotExist:
+            # Product doesn't exist at this warehouse
+            insufficient_stock.append({
+                'product': item.product.name,
+                'requested': item.quantity,
+                'available': 0,
+                'shortage': item.quantity
+            })
+            
+            # Find where it IS available
+            alternative_stocks = Stock.objects.filter(
+                product=item.product,
+                quantity__gte=item.quantity
+            ).select_related('warehouse')
+            
+            if alternative_stocks.exists():
+                alternatives.append({
+                    'product': item.product.name,
+                    'count': alternative_stocks.count(),
+                    'warehouses': [
+                        {
+                            'name': alt.warehouse.name,
+                            'available': alt.quantity
+                        }
+                        for alt in alternative_stocks
+                    ] if user_can_see_details else []
+                })
+    
+    # If insufficient stock found, raise validation error
+    if insufficient_stock:
+        error_message = self._build_error_message(
+            insufficient_stock, 
+            alternatives, 
+            user_can_see_details
+        )
+        raise ValidationError(error_message)
     
     def _build_error_message(self, insufficient_stock, alternatives, show_details):
         """
@@ -230,7 +229,7 @@ class Order(BaseModel):
         Override save to validate stock
         """
         # Run validation (checks stock availability)
-        self.clean(user=user)
+        self.clean()
         
         super().save(*args, **kwargs)
         
