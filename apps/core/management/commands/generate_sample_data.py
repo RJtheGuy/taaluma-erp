@@ -1063,7 +1063,7 @@ class Command(BaseCommand):
                         'phone': f'+39 3{random.randint(10,99)} {random.randint(100,999)} {random.randint(1000,9999)}',
                         'address': f'Via Roma {random.randint(1,150)}, Italia',
                         'is_active': True,
-                        'created_by': admin_user,
+                        # 'created_by': admin_user,
                     }
                 )
                 
