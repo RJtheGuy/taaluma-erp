@@ -168,41 +168,30 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
 # Logging Configuration
+# Logging Configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
+            'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'taaluma.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
             'formatter': 'verbose',
         },
     },
     'loggers': {
-        'django': {
-            'handlers': ['console', 'file'],
+        'apps.sales': {
+            'handlers': ['console'],
             'level': 'INFO',
         },
-        'apps': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': False,
+        'apps.inventory': {
+            'handlers': ['console'],
+            'level': 'INFO',
         },
     },
 }
