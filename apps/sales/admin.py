@@ -275,26 +275,13 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 1
     fields = ['product', 'quantity', 'price', 'subtotal']
-    readonly_fields = ['subtotal']
+    readonly_fields = ['product', 'quantity', 'price', 'subtotal']  # Make all readonly for confirmed
     
     def get_readonly_fields(self, request, obj=None):
         """Make ALL fields readonly for confirmed orders"""
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
             return ['product', 'quantity', 'price', 'subtotal']
         return ['subtotal']
-    
-    def get_fields(self, request, obj=None):
-        """For confirmed orders, show custom read-only product field"""
-        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
-            return ['product_display', 'quantity', 'price', 'subtotal']
-        return ['product', 'quantity', 'price', 'subtotal']
-    
-    def product_display(self, obj):
-        """Display product name as plain text (no link)"""
-        if obj and obj.product:
-            return format_html('<span>{}</span>', obj.product.name)
-        return '-'
-    product_display.short_description = 'Product'
     
     def has_add_permission(self, request, obj=None):
         """Prevent adding items to confirmed orders"""
@@ -683,7 +670,7 @@ class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                 extra_context['show_save'] = False
                 extra_context['show_save_and_continue'] = False
                 extra_context['show_save_and_add_another'] = False
-                extra_context['show_delete'] = True  # Hide delete button in UI
+                extra_context['show_delete'] = False
                 extra_context['title'] = f'View Order Item (Read-Only)'
         except:
             pass
