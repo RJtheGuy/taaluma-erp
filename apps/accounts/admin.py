@@ -136,4 +136,3 @@ class UserAdmin(BaseUserAdmin):
                 )
         
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
