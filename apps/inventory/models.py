@@ -1,5 +1,5 @@
-# from django.db import models
-# from apps.core.models import TrackableModel
+from django.db import models
+from apps.core.models import TrackableModel
 
 
 # class Warehouse(TrackableModel):
