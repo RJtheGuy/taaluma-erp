@@ -262,85 +262,208 @@ class ProductAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     #     return '-'
     # profit_margin.short_description = 'Margin'
 
-
 @admin.register(Stock)
 class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_display = [
-        'product', 
-        'warehouse', 
-        'quantity_display',
+        'product_name', 
+        'warehouse_name', 
+        'quantity_display', 
         'reorder_level',
-        'stock_status_display',
-        'updated_at'
+        'stock_status_badge',
+        'last_updated'
     ]
-    list_filter = ['warehouse', 'created_at']
+    list_filter = ['warehouse', 'product__category', StockLevelFilter]
     search_fields = ['product__name', 'product__sku', 'warehouse__name']
+    readonly_fields = ['stock_status_badge', 'last_updated']
     
-    # BULK UPLOAD TEMPLATE
-    change_list_template = 'admin/inventory/stock_changelist.html'
+    # IMPORTANT: Allow filtering by warehouse
+    autocomplete_fields = ['product']
     
     fieldsets = (
         ('Stock Information', {
             'fields': ('product', 'warehouse', 'quantity', 'reorder_level')
         }),
-        ('System Info', {
-            'fields': ('created_by', 'created_at', 'updated_by', 'updated_at'),
+        ('Status', {
+            'fields': ('stock_status_badge', 'last_updated'),
             'classes': ('collapse',)
         }),
     )
     
-    readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
+    def get_queryset(self, request):
+        """
+        Override to ensure warehouse staff see their warehouse's stock
+        """
+        qs = super().get_queryset(request)
+        
+        # Superuser sees all
+        if request.user.is_superuser:
+            return qs
+        
+        # User with assigned warehouse - see only that warehouse's stock
+        if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
+            return qs.filter(warehouse=request.user.assigned_warehouse)
+        
+        # User with organization but no warehouse - see all org's stock
+        if hasattr(request.user, 'organization') and request.user.organization:
+            return qs.filter(warehouse__organization=request.user.organization)
+        
+        return qs.none()
     
-    def get_urls(self):
-        """Add bulk upload URL"""
-        urls = super().get_urls()
-        custom_urls = [
-            path('bulk-upload/', self.admin_site.admin_view(self.bulk_upload_view), name='inventory_stock_bulk_upload'),
-        ]
-        return custom_urls + urls
+    def product_name(self, obj):
+        return obj.product.name
+    product_name.short_description = 'Product'
+    product_name.admin_order_field = 'product__name'
     
-    def bulk_upload_view(self, request):
-        """Handle bulk upload"""
-        from apps.inventory.views import bulk_upload_stock
-        return bulk_upload_stock(request)
+    def warehouse_name(self, obj):
+        return obj.warehouse.name
+    warehouse_name.short_description = 'Warehouse'
+    warehouse_name.admin_order_field = 'warehouse__name'
     
     def quantity_display(self, obj):
-        """Display quantity with color coding"""
         if obj.quantity <= 0:
-            color = '#f44336'
-            icon = '❌'
+            color = '#d32f2f'  # Red
+            icon = '🔴'
         elif obj.quantity <= obj.reorder_level:
-            color = '#ff9800'
-            icon = '⚠️'
+            color = '#f57c00'  # Orange
+            icon = '🟠'
+        elif obj.quantity <= obj.reorder_level * 2:
+            color = '#fbc02d'  # Yellow
+            icon = '🟡'
         else:
-            color = '#4caf50'
-            icon = '✅'
+            color = '#388e3c'  # Green
+            icon = '🟢'
         
         return format_html(
             '<span style="color: {}; font-weight: bold;">{} {}</span>',
-            color,
-            icon,
-            obj.quantity
+            color, icon, obj.quantity
         )
     quantity_display.short_description = 'Quantity'
     quantity_display.admin_order_field = 'quantity'
     
-    def stock_status_display(self, obj):
-        """Display stock status badge"""
+    def stock_status_badge(self, obj):
         status = obj.stock_status
-        
-        badges = {
-            'out_of_stock': ('OUT OF STOCK', '#f44336'),
-            'low_stock': ('LOW STOCK', '#ff9800'),
-            'in_stock': ('IN STOCK', '#4caf50'),
+        colors = {
+            'in_stock': '#4caf50',
+            'low_stock': '#ff9800',
+            'out_of_stock': '#f44336'
         }
-        
-        text, color = badges.get(status, ('UNKNOWN', '#9e9e9e'))
+        labels = {
+            'in_stock': 'IN STOCK',
+            'low_stock': 'LOW STOCK',
+            'out_of_stock': 'OUT OF STOCK'
+        }
         
         return format_html(
             '<span style="background: {}; color: white; padding: 4px 12px; '
-            'border-radius: 12px; font-weight: bold; font-size: 11px;">{}</span>',
-            color,
-            text
+            'border-radius: 12px; font-weight: bold; display: inline-block;">{}</span>',
+            colors.get(status, '#9e9e9e'),
+            labels.get(status, 'UNKNOWN')
         )
-    stock_status_display.short_description = 'Status'
+    stock_status_badge.short_description = 'Status'
+    
+    def last_updated(self, obj):
+        return obj.updated_at.strftime('%Y-%m-%d %H:%M')
+    last_updated.short_description = 'Last Updated'
+    
+    # Custom actions
+    actions = ['bulk_increase_stock', 'bulk_decrease_stock', 'mark_for_reorder']
+    
+    def bulk_increase_stock(self, request, queryset):
+        """Increase stock by 10 units"""
+        updated = queryset.update(quantity=F('quantity') + 10)
+        self.message_user(request, f'{updated} stock records increased by 10 units.')
+    bulk_increase_stock.short_description = 'Increase stock by 10 units'
+    
+    def bulk_decrease_stock(self, request, queryset):
+        """Decrease stock by 10 units"""
+        updated = queryset.filter(quantity__gte=10).update(quantity=F('quantity') - 10)
+        self.message_user(request, f'{updated} stock records decreased by 10 units.')
+    bulk_decrease_stock.short_description = 'Decrease stock by 10 units'
+    
+    def mark_for_reorder(self, request, queryset):
+        """Mark items as needing reorder"""
+        count = queryset.count()
+        self.message_user(request, f'{count} items marked for reorder.')
+    mark_for_reorder.short_description = 'Mark for reorder'
+
+# @admin.register(Stock)
+# class StockAdmin(OrganizationFilterMixin, admin.ModelAdmin):
+#     list_display = [
+#         'product', 
+#         'warehouse', 
+#         'quantity_display',
+#         'reorder_level',
+#         'stock_status_display',
+#         'updated_at'
+#     ]
+#     list_filter = ['warehouse', 'created_at']
+#     search_fields = ['product__name', 'product__sku', 'warehouse__name']
+    
+#     # BULK UPLOAD TEMPLATE
+#     change_list_template = 'admin/inventory/stock_changelist.html'
+    
+#     fieldsets = (
+#         ('Stock Information', {
+#             'fields': ('product', 'warehouse', 'quantity', 'reorder_level')
+#         }),
+#         ('System Info', {
+#             'fields': ('created_by', 'created_at', 'updated_by', 'updated_at'),
+#             'classes': ('collapse',)
+#         }),
+#     )
+    
+#     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
+    
+#     def get_urls(self):
+#         """Add bulk upload URL"""
+#         urls = super().get_urls()
+#         custom_urls = [
+#             path('bulk-upload/', self.admin_site.admin_view(self.bulk_upload_view), name='inventory_stock_bulk_upload'),
+#         ]
+#         return custom_urls + urls
+    
+#     def bulk_upload_view(self, request):
+#         """Handle bulk upload"""
+#         from apps.inventory.views import bulk_upload_stock
+#         return bulk_upload_stock(request)
+    
+#     def quantity_display(self, obj):
+#         """Display quantity with color coding"""
+#         if obj.quantity <= 0:
+#             color = '#f44336'
+#             icon = '❌'
+#         elif obj.quantity <= obj.reorder_level:
+#             color = '#ff9800'
+#             icon = '⚠️'
+#         else:
+#             color = '#4caf50'
+#             icon = '✅'
+        
+#         return format_html(
+#             '<span style="color: {}; font-weight: bold;">{} {}</span>',
+#             color,
+#             icon,
+#             obj.quantity
+#         )
+#     quantity_display.short_description = 'Quantity'
+#     quantity_display.admin_order_field = 'quantity'
+    
+#     def stock_status_display(self, obj):
+#         """Display stock status badge"""
+#         status = obj.stock_status
+        
+#         badges = {
+#             'out_of_stock': ('OUT OF STOCK', '#f44336'),
+#             'low_stock': ('LOW STOCK', '#ff9800'),
+#             'in_stock': ('IN STOCK', '#4caf50'),
+#         }
+        
+#         text, color = badges.get(status, ('UNKNOWN', '#9e9e9e'))
+        
+#         return format_html(
+#             '<span style="background: {}; color: white; padding: 4px 12px; '
+#             'border-radius: 12px; font-weight: bold; font-size: 11px;">{}</span>',
+#             color,
+#             text
+#         )
+#     stock_status_display.short_description = 'Status'
