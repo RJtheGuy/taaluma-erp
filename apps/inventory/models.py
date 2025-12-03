@@ -106,9 +106,27 @@ class Product(TrackableModel):
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     
+    # ADD THIS METHOD ↓
+    def clean(self):
+        """Validate product data"""
+        from django.core.exceptions import ValidationError
+        
+        if self.cost_price < 0:
+            raise ValidationError({'cost_price': 'Cost price cannot be negative'})
+        
+        if self.selling_price < 0:
+            raise ValidationError({'selling_price': 'Selling price cannot be negative'})
+        
+        if self.selling_price < self.cost_price:
+            raise ValidationError({
+                'selling_price': 'Selling price should not be less than cost price'
+            })
+        
+        if not self.sku or len(self.sku.strip()) < 2:
+            raise ValidationError({'sku': 'SKU must be at least 2 characters'})
+    
     class Meta:
         db_table = "products"
-        # ADD THIS ↓
         indexes = [
             models.Index(fields=['sku']),
             models.Index(fields=['category', 'is_active']),
