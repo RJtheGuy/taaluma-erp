@@ -167,7 +167,9 @@ class Order(BaseModel):
     notes = models.TextField(blank=True, null=True)
     
     # Keep this field for database compatibility (not used in logic)
-    is_locked = models.BooleanField(default=False)
+    # is_locked = models.BooleanField(default=False)
+    is_locked = models.BooleanField(default=False, null=True, blank=True)
+
     
     class Meta:
         db_table = 'orders'
