@@ -64,11 +64,18 @@ class Order(BaseModel):
     def __str__(self):
         return f"Order #{str(self.id)[:8]} - {self.customer.name if self.customer else 'No Customer'}"
     
-    def clean(self, user=None):
-        """
-        Validate order before saving
-        Check stock availability with permission-aware messages
-        """
+    def clean(self):
+        """Validate order before saving"""
+        from django.core.exceptions import ValidationError
+        
+        # Check customer is active
+        if self.customer and not self.customer.is_active:
+            raise ValidationError({'customer': 'Cannot create order for inactive customer'})
+        
+        # Check warehouse is active
+        if self.warehouse and not self.warehouse.is_active:
+            raise ValidationError({'warehouse': 'Cannot use inactive warehouse'})
+            
         super().clean()
         
         # Only validate stock for confirmed orders
