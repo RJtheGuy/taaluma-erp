@@ -63,3 +63,34 @@ class CanViewAnalytics(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         return request.user and request.user.role in ['manager', 'admin']
+
+
+class IsOrganizationMember(permissions.BasePermission):
+    """
+    Only allow users to access their organization's data
+    """
+    
+    def has_permission(self, request, view):
+        # Must be authenticated
+        return request.user and request.user.is_authenticated
+    
+    def has_object_permission(self, request, view, obj):
+        # Superusers see everything
+        if request.user.is_superuser:
+            return True
+        
+        user_org = getattr(request.user, 'organization', None)
+        if not user_org:
+            return False
+        
+        # Check organization match based on object type
+        if hasattr(obj, 'organization'):
+            return obj.organization == user_org
+        
+        if hasattr(obj, 'warehouse'):
+            return obj.warehouse.organization == user_org
+        
+        if hasattr(obj, 'created_by'):
+            return obj.created_by.organization == user_org
+        
+        return False
