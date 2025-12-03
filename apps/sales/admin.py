@@ -536,6 +536,17 @@ class OrderItemInline(admin.TabularInline):
     fields = ['product_display', 'quantity', 'price', 'subtotal']
     readonly_fields = ['product_display', 'quantity', 'price', 'subtotal']
     
+    # ADD THIS METHOD ↓
+    def get_formset(self, request, obj=None, **kwargs):
+        """Get formset and add new_objects property"""
+        formset_class = super().get_formset(request, obj, **kwargs)
+        
+        # Monkey-patch to add new_objects property
+        if not hasattr(formset_class, 'new_objects'):
+            formset_class.new_objects = []
+        
+        return formset_class
+    
     def get_fields(self, request, obj=None):
         """Show different fields based on order status"""
         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
