@@ -70,7 +70,8 @@ from apps.core.models import TrackableModel
 #             return "in_stock"
 
 
-# apps/inventory/models.py
+from django.db import models
+from apps.core.models import TrackableModel
 
 class Warehouse(TrackableModel):
     """Warehouse/storage location"""
@@ -89,11 +90,15 @@ class Warehouse(TrackableModel):
     class Meta:
         db_table = "warehouses"
         ordering = ['name']
-        # ADD THIS ↓
         indexes = [
             models.Index(fields=['organization', 'is_active']),
             models.Index(fields=['name']),
         ]
+    
+    def __str__(self):
+        if self.organization:
+            return f"{self.name} - {self.organization.name}"
+        return self.name
 
 
 class Product(TrackableModel):
@@ -106,23 +111,22 @@ class Product(TrackableModel):
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     
-    # ADD THIS METHOD ↓
     def clean(self):
         """Validate product data"""
         from django.core.exceptions import ValidationError
         
-        if self.cost_price < 0:
+        if self.cost_price and self.cost_price < 0:
             raise ValidationError({'cost_price': 'Cost price cannot be negative'})
         
-        if self.selling_price < 0:
+        if self.selling_price and self.selling_price < 0:
             raise ValidationError({'selling_price': 'Selling price cannot be negative'})
         
-        if self.selling_price < self.cost_price:
+        if self.selling_price and self.cost_price and self.selling_price < self.cost_price:
             raise ValidationError({
                 'selling_price': 'Selling price should not be less than cost price'
             })
         
-        if not self.sku or len(self.sku.strip()) < 2:
+        if not self.sku or len(str(self.sku).strip()) < 2:
             raise ValidationError({'sku': 'SKU must be at least 2 characters'})
     
     class Meta:
@@ -147,7 +151,6 @@ class Stock(TrackableModel):
     class Meta:
         db_table = "stocks"
         unique_together = ["product", "warehouse"]
-        # ADD THIS ↓
         indexes = [
             models.Index(fields=['warehouse', 'product']),
             models.Index(fields=['quantity']),
@@ -165,6 +168,3 @@ class Stock(TrackableModel):
             return "low_stock"
         else:
             return "in_stock"
-
-
-
