@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sales', '0003_remove_customer_created_by_and_more'),  # ← Change this to match your last migration
+        ('sales', '0003_alter_orderitem_options_and_more'),  # ← Change this to match your last migration
     ]
 
     operations = [
