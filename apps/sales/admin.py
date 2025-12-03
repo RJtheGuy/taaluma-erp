@@ -575,6 +575,26 @@ class OrderItemInline(admin.TabularInline):
             )
         return '-'
     product_display.short_description = 'Product'
+
+    def get_queryset(self, request):
+        """
+        Override to ensure warehouse staff see their warehouse's orders
+        """
+        qs = super().get_queryset(request)
+        
+        # Superuser sees all
+        if request.user.is_superuser:
+            return qs
+        
+        # User with assigned warehouse - see only that warehouse's orders
+        if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
+            return qs.filter(warehouse=request.user.assigned_warehouse)
+        
+        # User with organization but no warehouse - see all org's orders
+        if hasattr(request.user, 'organization') and request.user.organization:
+            return qs.filter(warehouse__organization=request.user.organization)
+        
+        return qs.none()
     
     def has_add_permission(self, request, obj=None):
         """Prevent adding items to confirmed orders"""
