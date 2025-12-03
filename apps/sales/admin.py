@@ -737,128 +737,138 @@ class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
             f'✅ Deleted {count} orders and restored stock where applicable'
         )
     
-    def save_model(self, request, obj, form, change):
-        """
-        CRITICAL: Block any attempts to save confirmed orders
-        This is a safety net in case form submission bypasses permissions
-        """
-        # Check if trying to modify a confirmed order
-        if change and obj.pk:
-            try:
-                old_order = Order.objects.get(pk=obj.pk)
-                if old_order.status in ['confirmed', 'shipped', 'delivered']:
-                    messages.error(
-                        request,
-                        '❌ Cannot modify confirmed/shipped/delivered orders. This order is locked.'
-                    )
-                    return  # Don't save
-            except Order.DoesNotExist:
-                pass
-        
-        # Auto-assign warehouse if user has one
-        if not obj.warehouse and hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
-            obj.warehouse = request.user.assigned_warehouse
-        
-        # Track if this is a new order
-        obj._is_new_order = obj.pk is None
-        
-        # Track old status for stock management
-        if change:
-            try:
-                old_order = Order.objects.get(pk=obj.pk)
-                obj._old_status = old_order.status
-            except Order.DoesNotExist:
-                obj._old_status = None
-        else:
-            obj._old_status = None
-        
-        super().save_model(request, obj, form, change)
+def save_model(self, request, obj, form, change):
+    """Track status changes for stock management"""
     
-    def save_formset(self, request, form, formset, change):
-        """Handle order items and stock deduction"""
-        order = form.instance
-        
-        # CRITICAL: Block if order is confirmed
-        if order.status in ['confirmed', 'shipped', 'delivered'] and change:
-            messages.error(
-                request,
-                '❌ Cannot modify items on confirmed orders. Order is locked.'
-            )
-            return  # Don't save
-        
-        # Save items
-        instances = formset.save(commit=False)
-        
-        for instance in instances:
-            instance.save()
-        
-        # Handle deletions
-        for obj in formset.deleted_objects:
-            obj.delete()
-        
-        formset.save_m2m()
-        
-        # Recalculate total
-        order.calculate_total()
-        
-        # Get status info
-        new_status = order.status
-        old_status = getattr(order, '_old_status', None)
-        is_new = getattr(order, '_is_new_order', False)
-        
-        # Handle stock deduction/restoration based on status changes
-        if is_new and new_status in ['confirmed', 'shipped', 'delivered']:
-            # New order created as confirmed
-            if order.warehouse:
-                try:
-                    order.deduct_stock()
-                    messages.success(
-                        request,
-                        f'✅ Order created and stock deducted from {order.warehouse.name}'
-                    )
-                except ValidationError as e:
-                    # Stock validation failed - DELETE the order
-                    order.items.all().delete()
-                    order.delete()
-                    messages.error(request, str(e.message))
-                    return
-            else:
-                messages.warning(request, '⚠️ No warehouse assigned - stock NOT deducted')
-        
-        elif change and old_status == 'pending' and new_status in ['confirmed', 'shipped', 'delivered']:
-            # Pending to confirmed
-            if order.warehouse:
-                try:
-                    order.deduct_stock()
-                    messages.success(
-                        request,
-                        f'✅ Order confirmed - stock deducted from {order.warehouse.name}'
-                    )
-                except ValidationError as e:
-                    # Stock validation failed - ROLLBACK
-                    order.status = old_status
-                    order.save()
-                    messages.error(request, str(e.message))
-                    return
-            else:
-                messages.error(request, '⚠️ No warehouse assigned')
-        
-        elif change and old_status in ['confirmed', 'shipped', 'delivered'] and new_status == 'cancelled':
-            # Confirmed to cancelled - restore stock
-            if order.warehouse:
+    # Check if trying to modify a confirmed order
+    if change and obj.pk:
+        try:
+            old_order = Order.objects.get(pk=obj.pk)
+            if old_order.status in ['confirmed', 'shipped', 'delivered']:
+                messages.error(
+                    request,
+                    '❌ Cannot modify confirmed/shipped/delivered orders. This order is locked.'
+                )
+                return  # Don't save
+        except Order.DoesNotExist:
+            pass
+    
+    # Auto-assign warehouse if user has one
+    if not obj.warehouse and hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
+        obj.warehouse = request.user.assigned_warehouse
+    
+    # Track if this is a new order
+    obj._is_new_order = obj.pk is None
+    
+    # Track old status for stock management
+    if change:
+        try:
+            old_order = Order.objects.get(pk=obj.pk)
+            obj._old_status = old_order.status
+        except Order.DoesNotExist:
+            obj._old_status = None
+    else:
+        obj._old_status = None
+    
+    super().save_model(request, obj, form, change)
+    
+def save_formset(self, request, form, formset, change):
+    """Handle order items and stock deduction"""
+    order = form.instance
+    
+    # CRITICAL: Block if order is confirmed
+    if order.status in ['confirmed', 'shipped', 'delivered'] and change:
+        messages.error(
+            request,
+            '❌ Cannot modify items on confirmed orders. Order is locked.'
+        )
+        return  # Don't save
+    
+    # Save items
+    instances = formset.save(commit=False)
+    
+    for instance in instances:
+        instance.save()
+    
+    # Handle deletions
+    for obj in formset.deleted_objects:
+        obj.delete()
+    
+    formset.save_m2m()
+    
+    # Recalculate total
+    order.calculate_total()
+    
+    # Get status info
+    new_status = order.status
+    old_status = getattr(order, '_old_status', None)
+    is_new = getattr(order, '_is_new_order', False)
+    
+    # Handle stock deduction/restoration based on status changes
+    if is_new and new_status in ['confirmed', 'shipped', 'delivered']:
+        # New order created as confirmed
+        if order.warehouse:
+            try:
+                order.deduct_stock()
+                messages.success(
+                    request,
+                    f'✅ Order created and stock deducted from {order.warehouse.name}'
+                )
+            except ValidationError as e:
+                # Stock validation failed - DELETE the order
+                order.items.all().delete()
+                order.delete()
+                messages.error(request, str(e))
+                return
+        else:
+            messages.warning(request, '⚠️ No warehouse assigned - stock NOT deducted')
+    
+    elif change and old_status == 'pending' and new_status in ['confirmed', 'shipped', 'delivered']:
+        # Pending to confirmed
+        if order.warehouse:
+            try:
+                order.deduct_stock()
+                messages.success(
+                    request,
+                    f'✅ Order confirmed - stock deducted from {order.warehouse.name}'
+                )
+            except ValidationError as e:
+                # Stock validation failed - ROLLBACK status
+                order.status = old_status
+                order.save()
+                messages.error(request, str(e))
+                return
+            except Exception as e:
+                # Catch any other errors
+                order.status = old_status
+                order.save()
+                messages.error(request, f'❌ Error deducting stock: {str(e)}')
+                return
+        else:
+            messages.error(request, '❌ No warehouse assigned - cannot confirm order')
+            order.status = old_status
+            order.save()
+            return
+    
+    elif change and old_status in ['confirmed', 'shipped', 'delivered'] and new_status == 'cancelled':
+        # Confirmed to cancelled - restore stock
+        if order.warehouse:
+            try:
                 order.restore_stock()
                 messages.warning(
                     request,
                     f'🔄 Order cancelled - stock restored to {order.warehouse.name}'
                 )
-        
-        elif new_status == 'pending':
-            messages.info(
-                request,
-                'ℹ️ Order saved as Pending - stock will be deducted when confirmed'
-            )
-
-
+            except Exception as e:
+                messages.error(request, f'⚠️ Error restoring stock: {str(e)}')
+        else:
+            messages.warning(request, '⚠️ Order cancelled but no warehouse to restore stock to')
+    
+    elif new_status == 'pending':
+        messages.info(
+            request,
+            'ℹ️ Order saved as Pending - stock will be deducted when confirmed'
+        )
 @admin.register(OrderItem)
 class OrderItemAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_display = ['order', 'product', 'quantity', 'price', 'subtotal']
