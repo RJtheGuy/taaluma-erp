@@ -25,11 +25,11 @@
 
 #     def __str__(self):
 #         return self.username
-# apps/accounts/models.py
+#apps/accounts/models.py
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from apps.core.models import BaseModel
-
+from django.utils import timezone
 
 class Organization(BaseModel):
     """Organization/Company - each client is one organization"""
@@ -99,6 +99,8 @@ class User(AbstractUser, BaseModel):
         blank=True,
         related_name='assigned_users'
     )
+
+    date_joined = models.DateTimeField(default=timezone.now)
     
     class Meta:
         db_table = "users"
