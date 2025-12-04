@@ -6,7 +6,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('accounts', '0001_initial'),  
-        ('sales', '0004_auto_20241204_0000'), 
+        ('sales', '0003_alter_orderitem_options_and_more'), 
     ]
 
     operations = [
