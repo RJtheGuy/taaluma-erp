@@ -129,11 +129,12 @@ class OrganizationFilterMixin:
         # Strategy 4: Customer - filter by orders' warehouse organization
         # Customers are shown if they have orders in user's organization
         if model_name == 'Customer':
-            if user_warehouse:
-                # Show customers who have orders at this warehouse
-                return qs.filter(orders__warehouse=user_warehouse).distinct()
-            # Show customers who have orders at any warehouse in organization
-            return qs.filter(orders__warehouse__organization=user_org).distinct()
+            return qs
+            # if user_warehouse:
+            #     # Show customers who have orders at this warehouse
+            #     return qs.filter(orders__warehouse=user_warehouse).distinct()
+            # # Show customers who have orders at any warehouse in organization
+            # return qs.filter(orders__warehouse__organization=user_org).distinct()
         
         # Strategy 5: Model has created_by field (Product)
         if hasattr(model, 'created_by'):
