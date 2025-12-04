@@ -525,12 +525,12 @@ from apps.inventory.models import Product
 
 @admin.register(Customer)
 class CustomerAdmin(OrganizationFilterMixin, admin.ModelAdmin):
-    list_display = ['name', 'email', 'phone', 'is_active', 'created_at']
-    list_filter = ['is_active', 'created_at']
+    list_display = ['name', 'email', 'phone', 'organization', 'is_active', 'created_at']
+    list_filter = ['is_active', 'organization', 'created_at']
     search_fields = ['name', 'email', 'phone']
     
     def save_model(self, request, obj, form, change):
-        """Auto-assign organization on create"""
+        """Auto-assign organization to new customers"""
         if not change and not obj.organization:
             if hasattr(request.user, 'organization'):
                 obj.organization = request.user.organization
