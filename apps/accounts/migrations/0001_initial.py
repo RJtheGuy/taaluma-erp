@@ -31,7 +31,6 @@ class Migration(migrations.Migration):
                 ('address', models.TextField(blank=True, null=True)),
                 ('trial_end_date', models.DateField(blank=True, null=True)),
                 ('notes', models.TextField(blank=True, null=True)),
-                ('is_active', models.BooleanField(default=True)),
             ],
             options={
                 'db_table': 'organizations',
