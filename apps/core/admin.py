@@ -103,11 +103,25 @@ def formfield_for_foreignkey(self, db_field, request, **kwargs):
                 if db_field.name == "product":
                     from apps.inventory.models import Product
                     kwargs["queryset"] = Product.objects.filter(created_by__organization=user_org)
-                
-                # Filter customers - show customers from user's organization
+
+                # Filter customers - show customers who have ordered from user's organization
                 if db_field.name == "customer":
                     from apps.sales.models import Customer
-                    kwargs["queryset"] =  Customer.objects.all()  #Customer.objects.filter(created_by__organization=user_org)
+                    # Show customers who have orders at user's organization warehouses
+                    if user_warehouse:
+                        # Staff: show customers who ordered from their specific warehouse
+                        kwargs["queryset"] = Customer.objects.filter(
+                            orders__warehouse=user_warehouse
+                        ).distinct()
+                    else:
+                        # Manager/Admin: show customers who ordered from ANY org warehouse
+                        kwargs["queryset"] = Customer.objects.filter(
+                            orders__warehouse__organization=user_org
+                        ).distinct()
+                # # Filter customers - show customers from user's organization
+                # if db_field.name == "customer":
+                #     from apps.sales.models import Customer
+                #     kwargs["queryset"] =  Customer.objects.all()  #Customer.objects.filter(created_by__organization=user_org)
         
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
