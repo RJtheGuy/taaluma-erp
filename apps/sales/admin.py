@@ -536,22 +536,50 @@ class CustomerAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                 obj.organization = request.user.organization
         super().save_model(request, obj, form, change)
 
+# class OrderItemInline(admin.TabularInline):
+#     model = OrderItem
+#     extra = 1
+#     fields = ['product_display', 'quantity', 'price', 'subtotal']
+#     readonly_fields = ['product_display', 'quantity', 'price', 'subtotal']
+    
+#     # ADD THIS METHOD ↓
+#     def get_formset(self, request, obj=None, **kwargs):
+#         """Get formset and add new_objects property"""
+#         formset_class = super().get_formset(request, obj, **kwargs)
+        
+#         # Monkey-patch to add new_objects property
+#         if not hasattr(formset_class, 'new_objects'):
+#             formset_class.new_objects = []
+        
+#         return formset_class
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 1
-    fields = ['product_display', 'quantity', 'price', 'subtotal']
-    readonly_fields = ['product_display', 'quantity', 'price', 'subtotal']
+    fields = ['product', 'quantity', 'price', 'subtotal']
+    readonly_fields = ['subtotal']
     
-    # ADD THIS METHOD ↓
+    def get_queryset(self, request):
+        """
+        OrderItem doesn't have warehouse field - it inherits from Order.
+        No filtering needed here; Order filtering handles it.
+        """
+        qs = super().get_queryset(request)
+        # No filtering - OrderItems are already filtered by parent Order
+        return qs
+    
     def get_formset(self, request, obj=None, **kwargs):
-        """Get formset and add new_objects property"""
-        formset_class = super().get_formset(request, obj, **kwargs)
+        """Filter products by user's organization"""
+        formset = super().get_formset(request, obj, **kwargs)
         
-        # Monkey-patch to add new_objects property
-        if not hasattr(formset_class, 'new_objects'):
-            formset_class.new_objects = []
+        # Filter product choices by organization
+        if not request.user.is_superuser:
+            if hasattr(request.user, 'organization') and request.user.organization:
+                from apps.inventory.models import Product
+                formset.form.base_fields['product'].queryset = Product.objects.filter(
+                    created_by__organization=request.user.organization
+                )
         
-        return formset_class
+        return formset
     
     def get_fields(self, request, obj=None):
         """Show different fields based on order status"""
