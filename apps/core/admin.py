@@ -110,7 +110,7 @@ class OrganizationFilterMixin:
         model = qs.model
         model_name = model.__name__
         
-        # Strategy 1: Model has organization field directly (Warehouse, Organization, Customer)
+        # Strategy 1: Model has organization field directly (Warehouse, Organization)
         if hasattr(model, 'organization'):
             return qs.filter(organization=user_org)
         
@@ -126,10 +126,21 @@ class OrganizationFilterMixin:
                 return qs.filter(order__warehouse=user_warehouse)
             return qs.filter(order__warehouse__organization=user_org)
         
-        # Strategy 4: Model has created_by field (Product)
+        # Strategy 4: Customer - filter by orders' warehouse organization
+        # Customers are shown if they have orders in user's organization
+        if model_name == 'Customer':
+            if user_warehouse:
+                # Show customers who have orders at this warehouse
+                return qs.filter(orders__warehouse=user_warehouse).distinct()
+            # Show customers who have orders at any warehouse in organization
+            return qs.filter(orders__warehouse__organization=user_org).distinct()
+        
+        # Strategy 5: Model has created_by field (Product)
         if hasattr(model, 'created_by'):
             return qs.filter(created_by__organization=user_org)
         
+        # Fallback: show all (for shared resources like customers)
+        return qs
         # Fallback: show nothing
         return qs.none()
     def save_model(self, request, obj, form, change):
