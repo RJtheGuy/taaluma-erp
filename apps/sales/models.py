@@ -14,6 +14,14 @@ class Customer(TrackableModel):
     phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+
+        organization = models.ForeignKey(
+        'accounts.Organization',
+        on_delete=models.CASCADE,
+        related_name='customers',
+        help_text="Organization that owns this customer"
+    )
+    
     
     class Meta:
         db_table = 'customers'
