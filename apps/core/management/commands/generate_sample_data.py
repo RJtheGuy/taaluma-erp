@@ -1075,42 +1075,42 @@ class Command(BaseCommand):
     #     return customers
 
     def create_customers(self, count, users, organizations):
-    """Create customers for each organization"""
-    customers = {}
-    
-    italian_names = [
-        ('Giovanni', 'Romano'), ('Maria', 'Rizzo'), ('Giuseppe', 'Fontana'),
-        ('Anna', 'Marino'), ('Francesco', 'Greco'), ('Laura', 'Bruno'),
-        ('Alessandro', 'Galli'), ('Sofia', 'Conti'), ('Matteo', 'De Luca'),
-    ]
-    
-    for org_slug, org in organizations.items():
-        customers[org_slug] = []
-        admin_user = users.get(f'admin.{org_slug.replace("-", "")}') or users.get(f'{org_slug.replace("-", "_")}_admin')
+        """Create customers for each organization"""
+        customers = {}
         
-        if not admin_user:
-            continue
+        italian_names = [
+            ('Giovanni', 'Romano'), ('Maria', 'Rizzo'), ('Giuseppe', 'Fontana'),
+            ('Anna', 'Marino'), ('Francesco', 'Greco'), ('Laura', 'Bruno'),
+            ('Alessandro', 'Galli'), ('Sofia', 'Conti'), ('Matteo', 'De Luca'),
+        ]
         
-        for i in range(count // len(organizations)):
-            first_name, last_name = random.choice(italian_names)
+        for org_slug, org in organizations.items():
+            customers[org_slug] = []
+            admin_user = users.get(f'admin.{org_slug.replace("-", "")}') or users.get(f'{org_slug.replace("-", "_")}_admin')
             
-            customer, created = Customer.objects.get_or_create(
-                email=f'{first_name.lower()}.{last_name.lower()}.{org_slug}.{i+1}@example.it',
-                defaults={
-                    'name': f'{first_name} {last_name}',
-                    'phone': f'+39 3{random.randint(10,99)} {random.randint(100,999)} {random.randint(1000,9999)}',
-                    'address': f'Via Roma {random.randint(1,150)}, Italia',
-                    'is_active': True,
-                    'organization': org,  # ← NOW WE CAN SET THIS!
-                }
-            )
+            if not admin_user:
+                continue
             
-            customers[org_slug].append(customer)
-            
-            if created and i % 3 == 0:
-                self.stdout.write(f'  ✓ {customer.name} → {org.name}')
-    
-    return customers
+            for i in range(count // len(organizations)):
+                first_name, last_name = random.choice(italian_names)
+                
+                customer, created = Customer.objects.get_or_create(
+                    email=f'{first_name.lower()}.{last_name.lower()}.{org_slug}.{i+1}@example.it',
+                    defaults={
+                        'name': f'{first_name} {last_name}',
+                        'phone': f'+39 3{random.randint(10,99)} {random.randint(100,999)} {random.randint(1000,9999)}',
+                        'address': f'Via Roma {random.randint(1,150)}, Italia',
+                        'is_active': True,
+                        'organization': org,  # ← NOW WE CAN SET THIS!
+                    }
+                )
+                
+                customers[org_slug].append(customer)
+                
+                if created and i % 3 == 0:
+                    self.stdout.write(f'  ✓ {customer.name} → {org.name}')
+        
+        return customers
     
     def create_orders(self, count, customers, products, warehouses, users):
         """Create orders for each organization"""
