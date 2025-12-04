@@ -35,7 +35,7 @@ class Organization(BaseModel):
     """Organization/Company - each client is one organization"""
     name = models.CharField(max_length=255, help_text="Client company name")
     slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
-    # is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
     
     contact_email = models.EmailField(null=True, blank=True)
     contact_phone = models.CharField(max_length=20, null=True, blank=True)
