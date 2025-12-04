@@ -81,49 +81,72 @@ class OrganizationFilterMixin:
 
 
 def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """
-        Filter foreign key choices by organization and warehouse.
-        """
-        if not request.user.is_superuser:
-            user_org = getattr(request.user, 'organization', None)
-            user_warehouse = getattr(request.user, 'assigned_warehouse', None)
-            
-            if user_org:
-                # Filter warehouses
-                if db_field.name == "warehouse":
-                    from apps.inventory.models import Warehouse
-                    # If user has assigned warehouse, only show that one
-                    if user_warehouse:
-                        kwargs["queryset"] = Warehouse.objects.filter(id=user_warehouse.id)
-                    else:
-                        # Show all warehouses in user's organization
-                        kwargs["queryset"] = Warehouse.objects.filter(organization=user_org)
-                
-                # Filter products - show products from user's organization
-                if db_field.name == "product":
-                    from apps.inventory.models import Product
-                    kwargs["queryset"] = Product.objects.filter(created_by__organization=user_org)
-
-                # Filter customers - show customers who have ordered from user's organization
-                if db_field.name == "customer":
-                    from apps.sales.models import Customer
-                    # Show customers who have orders at user's organization warehouses
-                    if user_warehouse:
-                        # Staff: show customers who ordered from their specific warehouse
-                        kwargs["queryset"] = Customer.objects.filter(
-                            orders__warehouse=user_warehouse
-                        ).distinct()
-                    else:
-                        # Manager/Admin: show customers who ordered from ANY org warehouse
-                        kwargs["queryset"] = Customer.objects.filter(
-                            orders__warehouse__organization=user_org
-                        ).distinct()
-                # # Filter customers - show customers from user's organization
-                # if db_field.name == "customer":
-                #     from apps.sales.models import Customer
-                #     kwargs["queryset"] =  Customer.objects.all()  #Customer.objects.filter(created_by__organization=user_org)
+    """
+    Filter foreign key choices by organization and warehouse.
+    """
+    if not request.user.is_superuser:
+        user_org = getattr(request.user, 'organization', None)
+        user_warehouse = getattr(request.user, 'assigned_warehouse', None)
         
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if user_org:
+            # Filter warehouses
+            if db_field.name == "warehouse":
+                from apps.inventory.models import Warehouse
+                # If user has assigned warehouse, only show that one
+                if user_warehouse:
+                    kwargs["queryset"] = Warehouse.objects.filter(id=user_warehouse.id)
+                else:
+                    # Show all warehouses in user's organization
+                    kwargs["queryset"] = Warehouse.objects.filter(organization=user_org)
+            
+            # Filter products - show products from user's organization
+            if db_field.name == "product":
+                from apps.inventory.models import Product
+                kwargs["queryset"] = Product.objects.filter(created_by__organization=user_org)
+            
+            # Customers - show ALL (they're shared resources without org field)
+            # No filtering needed since Customer has no organization or created_by
+            if db_field.name == "customer":
+                from apps.sales.models import Customer
+                # Don't filter - customers are shared across all organizations
+                # In production, you'd add organization FK to Customer model
+                kwargs["queryset"] = Customer.objects.all()
+    
+    return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+# def formfield_for_foreignkey(self, db_field, request, **kwargs):
+#         """
+#         Filter foreign key choices by organization and warehouse.
+#         """
+#         if not request.user.is_superuser:
+#             user_org = getattr(request.user, 'organization', None)
+#             user_warehouse = getattr(request.user, 'assigned_warehouse', None)
+            
+#             if user_org:
+#                 # Filter warehouses
+#                 if db_field.name == "warehouse":
+#                     from apps.inventory.models import Warehouse
+#                     # If user has assigned warehouse, only show that one
+#                     if user_warehouse:
+#                         kwargs["queryset"] = Warehouse.objects.filter(id=user_warehouse.id)
+#                     else:
+#                         # Show all warehouses in user's organization
+#                         kwargs["queryset"] = Warehouse.objects.filter(organization=user_org)
+                
+#                 # Filter products - show products from user's organization
+#                 if db_field.name == "product":
+#                     from apps.inventory.models import Product
+#                     kwargs["queryset"] = Product.objects.filter(created_by__organization=user_org)
+
+#                 # Filter customers - show customers who have ordered from user's organization
+#                 if db_field.name == "customer":
+#                     from apps.sales.models import Customer
+#                     # Show ALL customers who have ordered from ANY warehouse in user's organization
+#                     kwargs["queryset"] = Customer.objects.filter(
+#                         orders__warehouse__organization=user_org
+#                     ).distinct()
+        
+#         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
     
