@@ -8,12 +8,37 @@ from apps.core.models import TrackableModel
 logger = logging.getLogger(__name__)
 
 
+# class Customer(TrackableModel):
+#     name = models.CharField(max_length=255)
+#     email = models.EmailField(blank=True, null=True)
+#     phone = models.CharField(max_length=20, blank=True, null=True)
+#     address = models.TextField(blank=True, null=True)
+#     is_active = models.BooleanField(default=True)
+    
+#     class Meta:
+#         db_table = 'customers'
+#         ordering = ['-created_at']
+    
+#     def __str__(self):
+#         return self.name
+
+
 class Customer(TrackableModel):
     name = models.CharField(max_length=255)
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    
+    # ADD THIS FIELD ↓
+    organization = models.ForeignKey(
+        'accounts.Organization',
+        on_delete=models.CASCADE,
+        null=True,  # Temporarily nullable for migration
+        blank=True,
+        related_name='customers',
+        help_text="Organization that owns this customer"
+    )
     
     class Meta:
         db_table = 'customers'
