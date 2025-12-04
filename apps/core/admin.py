@@ -108,28 +108,30 @@ class OrganizationFilterMixin:
         user_org = request.user.organization
         user_warehouse = getattr(request.user, 'assigned_warehouse', None)
         model = qs.model
+        model_name = model.__name__
         
-        # Strategy 1: Model has organization field directly (Warehouse, Organization)
+        # Strategy 1: Model has organization field directly (Warehouse, Organization, Customer)
         if hasattr(model, 'organization'):
             return qs.filter(organization=user_org)
         
         # Strategy 2: Model has warehouse field (Order, Stock)
         if hasattr(model, 'warehouse'):
-            # If user has assigned warehouse, filter by that warehouse
             if user_warehouse:
                 return qs.filter(warehouse=user_warehouse)
-            # Otherwise, filter by organization
             return qs.filter(warehouse__organization=user_org)
         
-        # Strategy 3: Model has created_by field (Product, Customer)
-        # Filter by organization of creator, not just direct creator
+        # Strategy 3: OrderItem - filter by order's warehouse
+        if model_name == 'OrderItem':
+            if user_warehouse:
+                return qs.filter(order__warehouse=user_warehouse)
+            return qs.filter(order__warehouse__organization=user_org)
+        
+        # Strategy 4: Model has created_by field (Product)
         if hasattr(model, 'created_by'):
-            # Show products/customers created by anyone in the same organization
             return qs.filter(created_by__organization=user_org)
         
         # Fallback: show nothing
         return qs.none()
-    
     def save_model(self, request, obj, form, change):
         """Auto-assign organization and audit fields"""
         if not change:  # Creating new object
