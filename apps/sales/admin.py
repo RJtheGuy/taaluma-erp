@@ -536,27 +536,12 @@ class CustomerAdmin(OrganizationFilterMixin, admin.ModelAdmin):
                 obj.organization = request.user.organization
         super().save_model(request, obj, form, change)
 
-# class OrderItemInline(admin.TabularInline):
-#     model = OrderItem
-#     extra = 1
-#     fields = ['product_display', 'quantity', 'price', 'subtotal']
-#     readonly_fields = ['product_display', 'quantity', 'price', 'subtotal']
-    
-#     # ADD THIS METHOD ↓
-#     def get_formset(self, request, obj=None, **kwargs):
-#         """Get formset and add new_objects property"""
-#         formset_class = super().get_formset(request, obj, **kwargs)
-        
-#         # Monkey-patch to add new_objects property
-#         if not hasattr(formset_class, 'new_objects'):
-#             formset_class.new_objects = []
-        
-#         return formset_class
+
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 1
     fields = ['product', 'quantity', 'price', 'subtotal']
-    readonly_fields = ['subtotal']
+    readonly_fields = ['product_display', 'quantity', 'price', 'subtotal']
     
     def get_queryset(self, request):
         """
@@ -594,12 +579,8 @@ class OrderItemInline(admin.TabularInline):
         return ['subtotal']
     
     def product_display(self, obj):
-        """
-        Display product as a view-only link for confirmed orders
-        Links to a custom read-only product view
-        """
+        """Display product as a view-only link for confirmed orders"""
         if obj and obj.product:
-            # Create a link that goes to product detail but in read-only mode
             url = reverse('admin:inventory_product_change', args=[obj.product.id])
             return format_html(
                 '<a href="{}" onclick="return confirm(\'⚠️ This product is part of a confirmed order. You can VIEW but not EDIT it.\');">'
@@ -609,26 +590,101 @@ class OrderItemInline(admin.TabularInline):
             )
         return '-'
     product_display.short_description = 'Product'
+    
+    def has_add_permission(self, request, obj=None):
+        """Prevent adding items to confirmed orders"""
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return False
+        return super().has_add_permission(request, obj)
+    
+    def has_change_permission(self, request, obj=None):
+        """Prevent editing items on confirmed orders"""
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return False
+        return super().has_change_permission(request, obj)
+    
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deleting items on confirmed orders"""
+        if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+            return False
+        return super().has_delete_permission(request, obj)
+# class OrderItemInline(admin.TabularInline):
+#     model = OrderItem
+#     extra = 1
+#     fields = ['product', 'quantity', 'price', 'subtotal']
+#     readonly_fields = ['product_display', 'quantity', 'price', 'subtotal']
+    
+#     def get_queryset(self, request):
+#         """
+#         OrderItem doesn't have warehouse field - it inherits from Order.
+#         No filtering needed here; Order filtering handles it.
+#         """
+#         qs = super().get_queryset(request)
+#         # No filtering - OrderItems are already filtered by parent Order
+#         return qs
+    
+#     def get_formset(self, request, obj=None, **kwargs):
+#         """Filter products by user's organization"""
+#         formset = super().get_formset(request, obj, **kwargs)
+        
+#         # Filter product choices by organization
+#         if not request.user.is_superuser:
+#             if hasattr(request.user, 'organization') and request.user.organization:
+#                 from apps.inventory.models import Product
+#                 formset.form.base_fields['product'].queryset = Product.objects.filter(
+#                     created_by__organization=request.user.organization
+#                 )
+        
+#         return formset
+    
+#     def get_fields(self, request, obj=None):
+#         """Show different fields based on order status"""
+#         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+#             return ['product_display', 'quantity', 'price', 'subtotal']
+#         return ['product', 'quantity', 'price', 'subtotal']
+    
+#     def get_readonly_fields(self, request, obj=None):
+#         """Make ALL fields readonly for confirmed orders"""
+#         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+#             return ['product_display', 'quantity', 'price', 'subtotal']
+#         return ['subtotal']
+    
+#     def product_display(self, obj):
+#         """
+#         Display product as a view-only link for confirmed orders
+#         Links to a custom read-only product view
+#         """
+#         if obj and obj.product:
+#             # Create a link that goes to product detail but in read-only mode
+#             url = reverse('admin:inventory_product_change', args=[obj.product.id])
+#             return format_html(
+#                 '<a href="{}" onclick="return confirm(\'⚠️ This product is part of a confirmed order. You can VIEW but not EDIT it.\');">'
+#                 '{}</a>',
+#                 url,
+#                 obj.product.name
+#             )
+#         return '-'
+#     product_display.short_description = 'Product'
 
-    def get_queryset(self, request):
-        """
-        Override to ensure warehouse staff see their warehouse's orders
-        """
-        qs = super().get_queryset(request)
+#     def get_queryset(self, request):
+#         """
+#         Override to ensure warehouse staff see their warehouse's orders
+#         """
+#         qs = super().get_queryset(request)
         
-        # Superuser sees all
-        if request.user.is_superuser:
-            return qs
+#         # Superuser sees all
+#         if request.user.is_superuser:
+#             return qs
         
-        # User with assigned warehouse - see only that warehouse's orders
-        if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
-            return qs.filter(warehouse=request.user.assigned_warehouse)
+#         # User with assigned warehouse - see only that warehouse's orders
+#         if hasattr(request.user, 'assigned_warehouse') and request.user.assigned_warehouse:
+#             return qs.filter(warehouse=request.user.assigned_warehouse)
         
-        # User with organization but no warehouse - see all org's orders
-        if hasattr(request.user, 'organization') and request.user.organization:
-            return qs.filter(warehouse__organization=request.user.organization)
+#         # User with organization but no warehouse - see all org's orders
+#         if hasattr(request.user, 'organization') and request.user.organization:
+#             return qs.filter(warehouse__organization=request.user.organization)
         
-        return qs.none()
+#         return qs.none()
     
     def has_add_permission(self, request, obj=None):
         """Prevent adding items to confirmed orders"""
