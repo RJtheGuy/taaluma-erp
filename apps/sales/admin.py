@@ -528,7 +528,13 @@ class CustomerAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_display = ['name', 'email', 'phone', 'is_active', 'created_at']
     list_filter = ['is_active', 'created_at']
     search_fields = ['name', 'email', 'phone']
-
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-assign organization on create"""
+        if not change and not obj.organization:
+            if hasattr(request.user, 'organization'):
+                obj.organization = request.user.organization
+        super().save_model(request, obj, form, change)
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
