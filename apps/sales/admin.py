@@ -737,12 +737,34 @@ class OrderItemInline(admin.TabularInline):
         return super().has_delete_permission(request, obj)
 
 
+# @admin.register(Order)
+# class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
+#     list_display = ['id', 'customer', 'warehouse', 'total', 'status', 'created_at']
+#     list_filter = ['status', 'warehouse', 'created_at']
+#     search_fields = ['customer__name', 'id']
+#     inlines = [OrderItemInline]
+    
+#     def get_fields(self, request, obj=None):
+#         """
+#         Use different fields for confirmed orders
+#         Display custom read-only fields without clickable links
+#         """
+#         if obj and obj.status in ['confirmed', 'shipped', 'delivered']:
+#             return ['customer_display', 'warehouse_display', 'status', 'notes', 'total']
+#         return ['customer', 'warehouse', 'status', 'notes', 'total']
+
 @admin.register(Order)
 class OrderAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_display = ['id', 'customer', 'warehouse', 'total', 'status', 'created_at']
     list_filter = ['status', 'warehouse', 'created_at']
     search_fields = ['customer__name', 'id']
     inlines = [OrderItemInline]
+    
+    # ADD THIS METHOD
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filter dropdowns by organization"""
+        # Call the mixin's method to get organization-based filtering
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     def get_fields(self, request, obj=None):
         """
