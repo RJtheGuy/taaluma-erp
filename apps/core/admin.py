@@ -85,15 +85,24 @@ def formfield_for_foreignkey(self, db_field, request, **kwargs):
     Filter foreign key choices by organization and warehouse.
     CRITICAL: Enforce strict multi-tenancy - users only see their organization's data
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"formfield_for_foreignkey called: field={db_field.name}, user={request.user.username}, is_superuser={request.user.is_superuser}")
+    
     # Superuser sees everything
     if request.user.is_superuser:
+        logger.info(f"  → Superuser: showing all {db_field.name}")
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     # For all other users, apply organization filtering
     user_org = getattr(request.user, 'organization', None)
     user_warehouse = getattr(request.user, 'assigned_warehouse', None)
     
+    logger.info(f"  → Non-superuser: org={user_org}, warehouse={user_warehouse}")
+    
     if not user_org:
+        logger.warning(f"  → User has NO organization, blocking all {db_field.name}")
         # User has no organization - show nothing
         if db_field.name == "warehouse":
             from apps.inventory.models import Warehouse
@@ -117,26 +126,30 @@ def formfield_for_foreignkey(self, db_field, request, **kwargs):
         from apps.inventory.models import Warehouse
         if user_warehouse:
             # Staff with assigned warehouse - show ONLY their warehouse
+            logger.info(f"  → Filtering warehouses: showing only {user_warehouse.name}")
             kwargs["queryset"] = Warehouse.objects.filter(id=user_warehouse.id)
         else:
             # Admin/Manager - show all warehouses in THEIR organization
+            logger.info(f"  → Filtering warehouses: showing all from {user_org.name}")
             kwargs["queryset"] = Warehouse.objects.filter(organization=user_org)
     
     # 2. PRODUCTS - Show only user's organization products
     elif db_field.name == "product":
         from apps.inventory.models import Product
+        logger.info(f"  → Filtering products: showing only from {user_org.name}")
         kwargs["queryset"] = Product.objects.filter(created_by__organization=user_org)
     
     # 3. CUSTOMERS - Show only user's organization customers
     elif db_field.name == "customer":
         from apps.sales.models import Customer
+        logger.info(f"  → Filtering customers: showing only from {user_org.name}")
         kwargs["queryset"] = Customer.objects.filter(organization=user_org)
     
     # 4. ORGANIZATION - Non-superusers should NEVER see organization dropdown
-    #    Auto-assign their own organization instead
     elif db_field.name == "organization":
         from apps.accounts.models import Organization
-        # Show ONLY their organization (or none if switching would break data)
+        logger.info(f"  → Filtering organization: showing only {user_org.name}")
+        # Show ONLY their organization
         kwargs["queryset"] = Organization.objects.filter(id=user_org.id)
     
     return super().formfield_for_foreignkey(db_field, request, **kwargs)
