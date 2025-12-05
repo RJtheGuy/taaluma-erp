@@ -21,12 +21,12 @@ class TrackableModel(BaseModel):
         null=True, 
         related_name="created_%(class)s"
     )
-    updated_by = models.ForeignKey(
-        "accounts.User", 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        related_name="updated_%(class)s"
-    )
+    # updated_by = models.ForeignKey(
+    #     "accounts.User", 
+    #     on_delete=models.SET_NULL, 
+    #     null=True, 
+    #     related_name="updated_%(class)s"
+    # )
 
     class Meta:
         abstract = True
