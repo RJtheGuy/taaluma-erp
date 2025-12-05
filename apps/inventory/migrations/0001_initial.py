@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('accounts', '0003_user_additional_fields'),
+        ('accounts', '0002_add_is_active_to_organization'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
