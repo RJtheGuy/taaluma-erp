@@ -523,19 +523,51 @@ from apps.core.admin import OrganizationFilterMixin
 from .models import Customer, Order, OrderItem
 from apps.inventory.models import Product
 
+# @admin.register(Customer)
+# class CustomerAdmin(OrganizationFilterMixin, admin.ModelAdmin):
+#     list_display = ['name', 'email', 'phone', 'organization', 'is_active', 'created_at']
+#     list_filter = ['is_active', 'organization', 'created_at']
+#     search_fields = ['name', 'email', 'phone']
+    
+#     def save_model(self, request, obj, form, change):
+#         """Auto-assign organization to new customers"""
+#         if not change and not obj.organization:
+#             if hasattr(request.user, 'organization'):
+#                 obj.organization = request.user.organization
+#         super().save_model(request, obj, form, change)
+
 @admin.register(Customer)
 class CustomerAdmin(OrganizationFilterMixin, admin.ModelAdmin):
     list_display = ['name', 'email', 'phone', 'organization', 'is_active', 'created_at']
     list_filter = ['is_active', 'organization', 'created_at']
     search_fields = ['name', 'email', 'phone']
+    readonly_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
+    
+    def get_fields(self, request, obj=None):
+        """Hide organization field for non-superusers"""
+        fields = ['name', 'email', 'phone', 'address', 'is_active']
+        
+        # Only superusers can see/change organization
+        if request.user.is_superuser:
+            fields.insert(4, 'organization')  # Add after address
+        
+        return fields
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make organization readonly for non-superusers"""
+        readonly = ['created_at', 'updated_at', 'created_by', 'updated_by']
+        
+        if not request.user.is_superuser:
+            readonly.append('organization')
+        
+        return readonly
     
     def save_model(self, request, obj, form, change):
         """Auto-assign organization to new customers"""
         if not change and not obj.organization:
-            if hasattr(request.user, 'organization'):
+            if hasattr(request.user, 'organization') and request.user.organization:
                 obj.organization = request.user.organization
         super().save_model(request, obj, form, change)
-
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
