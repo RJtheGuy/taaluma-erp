@@ -124,23 +124,51 @@ from apps.core.admin import OrganizationFilterMixin
 from .models import Warehouse, Product, Stock
 
 
+# @admin.register(Warehouse)
+# class WarehouseAdmin(OrganizationFilterMixin, admin.ModelAdmin):
+#     list_display = ['name', 'location', 'organization', 'is_active', 'stock_count', 'created_at']
+#     list_filter = ['is_active', 'organization', 'created_at']
+#     search_fields = ['name', 'location']
+    
+#     fieldsets = (
+#         ('Warehouse Information', {
+#             'fields': ('name', 'location', 'organization', 'is_active')
+#         }),
+#         ('System Info', {
+#             'fields': ('created_by', 'created_at', 'updated_by', 'updated_at'),
+#             'classes': ('collapse',)
+#         }),
+#     )
+    
+#     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
+
 @admin.register(Warehouse)
 class WarehouseAdmin(OrganizationFilterMixin, admin.ModelAdmin):
-    list_display = ['name', 'location', 'organization', 'is_active', 'stock_count', 'created_at']
+    list_display = ['name', 'location', 'organization', 'is_active', 'created_at']
     list_filter = ['is_active', 'organization', 'created_at']
     search_fields = ['name', 'location']
+    readonly_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
     
-    fieldsets = (
-        ('Warehouse Information', {
-            'fields': ('name', 'location', 'organization', 'is_active')
-        }),
-        ('System Info', {
-            'fields': ('created_by', 'created_at', 'updated_by', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
+    def get_fields(self, request, obj=None):
+        """Hide organization field for non-superusers"""
+        fields = ['name', 'location', 'is_active']
+        
+        # Only superusers can see/change organization
+        if request.user.is_superuser:
+            fields.insert(2, 'organization')  # Add after location
+        
+        return fields
     
-    readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
+    def get_readonly_fields(self, request, obj=None):
+        """Make organization readonly for non-superusers if somehow visible"""
+        readonly = ['created_at', 'updated_at', 'created_by', 'updated_by']
+        
+        if not request.user.is_superuser:
+            readonly.append('organization')
+        
+        return readonly
+    
+    fieldsets = None  # Use get_fields instead
     
     def stock_count(self, obj):
         """Display number of stock records"""
