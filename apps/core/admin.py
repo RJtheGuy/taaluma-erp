@@ -46,7 +46,8 @@ class OrganizationFilterMixin:
                 # Show customers who have orders at this warehouse
                 return qs.filter(orders__warehouse=user_warehouse).distinct()
             # Show customers who have orders at any warehouse in organization
-            return qs.filter(orders__warehouse__organization=user_org).distinct()
+            # return qs.filter(orders__warehouse__organization=user_org).distinct()
+            return qs.filter(organization=user_org)
         
         # Strategy 5: Model has created_by field (Product)
         if hasattr(model, 'created_by'):
